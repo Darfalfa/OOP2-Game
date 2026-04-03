@@ -1,0 +1,97 @@
+import javax.swing.*;
+import java.awt.*;
+
+public class GameWindow extends JFrame {
+
+    public static final int WIDTH  = 1280;
+    public static final int HEIGHT = 720;
+
+    private CardLayout cardLayout;
+    private JPanel     root;
+
+    public static final String SCREEN_LOADING   = "LOADING";
+    public static final String SCREEN_MAIN      = "MAIN";
+    public static final String SCREEN_CHARACTER = "CHARACTER";
+    public static final String SCREEN_SETTINGS  = "SETTINGS";
+    public static final String SCREEN_GAME      = "GAME";
+    public static final String SCREEN_BATTLE    = "BATTLE";
+
+    private LoadingScreen loadingScreen;
+    private GameScreen    gameScreen;
+    private BattleScreen  battleScreen;
+
+    private String selectedCharacter = "Ronnix";
+
+    public GameWindow() {
+        setTitle("Great Ruins of Khai");
+        setSize(WIDTH, HEIGHT);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setResizable(true);
+        setMinimumSize(new Dimension(800, 500));
+        setLocationRelativeTo(null);
+
+        cardLayout = new CardLayout();
+        root = new JPanel(cardLayout);
+        root.setBackground(Color.BLACK);
+
+        loadingScreen = new LoadingScreen(this);
+        gameScreen    = new GameScreen(this);
+        battleScreen  = new BattleScreen(this, gameScreen);
+
+        root.add(loadingScreen,                   SCREEN_LOADING);
+        root.add(new MainMenuScreen(this),        SCREEN_MAIN);
+        root.add(new CharacterSelectScreen(this), SCREEN_CHARACTER);
+        root.add(new SettingsScreen(this),        SCREEN_SETTINGS);
+        root.add(gameScreen,                      SCREEN_GAME);
+        root.add(battleScreen,                    SCREEN_BATTLE);
+
+        add(root);
+        setVisible(true);
+    }
+
+    /** Called by CharacterSelectScreen when the player picks a character. */
+    public void setSelectedCharacter(String name) {
+        this.selectedCharacter = name;
+        battleScreen.setSelectedCharacter(name);
+        gameScreen.setSelectedCharacter(name);
+    }
+
+    public void showMainMenu()        { cardLayout.show(root, SCREEN_MAIN);      }
+    public void showCharacterSelect() { cardLayout.show(root, SCREEN_CHARACTER); }
+    public void showSettings()        { cardLayout.show(root, SCREEN_SETTINGS);  }
+    public void showGameScreen()      { cardLayout.show(root, SCREEN_GAME);      }
+
+    /**
+     * Called by CharacterSelectScreen after a character is chosen.
+     * Shows the loading screen first. startGame() will switch to SCREEN_GAME
+     * automatically once sprite loading finishes on the background thread.
+     */
+    public void showGame() {
+        cardLayout.show(root, SCREEN_LOADING);
+        loadingScreen.startLoading(() -> {
+            // Loading bar animation finished — kick off sprite loading.
+            // GameScreen.startGame() switches to SCREEN_GAME when ready.
+            gameScreen.startGame();
+        });
+    }
+
+    /**
+     * Switch to the battle screen and start a fight against the given enemy.
+     * When the battle ends, GameScreen.onBattleEnd() is called automatically.
+     */
+    public void showBattle(Enemy enemy, GameScreen gs) {
+        cardLayout.show(root, SCREEN_BATTLE);
+        battleScreen.requestFocusInWindow();
+        battleScreen.startBattle(
+            enemy,
+            gs.playerHp,  gs.playerMaxHp,
+            gs.playerMp,  gs.playerMaxMp,
+            gs.playerAtk, gs.playerDef,
+            () -> {
+                boolean won = battleScreen.playerWon();
+                gs.onBattleEnd(enemy, battleScreen.getPlayerHp(),
+                               battleScreen.getPlayerMp(), won);
+            }
+        );
+    }
+}
