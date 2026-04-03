@@ -1,8 +1,8 @@
 public abstract class Characters{
 
-    protected String name;
-    protected int health;
-    protected int damage;
+    private String name;
+    private int health;
+    private int damage;
 
     public Characters(String name, int health, int damage) {
         this.name = name;
