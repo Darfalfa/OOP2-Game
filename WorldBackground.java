@@ -21,14 +21,14 @@ public class WorldBackground {
     private static final int TILE_W = 960;
     private static final int TILE_H = 640;
 
-    public WorldBackground() {
-        try {
-            tile = ImageIO.read(new File("images/yourNewMap.png"));
-        } catch (Exception e) {
-            System.err.println("Could not load yourNewMap.png");
-            e.printStackTrace();
-        }
-    }
+    // public WorldBackground() {
+    //     try {
+    //         tile = ImageIO.read(new File("images/yourNewMap.png"));
+    //     } catch (Exception e) {
+    //         System.err.println("Could not load yourNewMap.png");
+    //         e.printStackTrace();
+    //     }
+    // }
 
     /**
      * Draw the tiled background.
