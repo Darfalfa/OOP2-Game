@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * GameScreen — gameplay panel adapted to your current project structure.
- * Replaces the old WorldBackground-only rendering with tutorial-style tiles.
+ * Uses map.txt + tiledata.txt + tile images from your tiles folder.
  */
 public class GameScreen extends JPanel implements Runnable {
 
@@ -21,9 +21,9 @@ public class GameScreen extends JPanel implements Runnable {
     public final int tileSize = originalTileSize * scale; // 48
 
     // world settings
-    public final int maxWorldCol = 30;
-    public final int maxWorldRow = 20;
-    final int worldWidth  = tileSize * maxWorldCol;
+    public int maxWorldCol = 50;
+    public int maxWorldRow = 50;
+    final int worldWidth = tileSize * maxWorldCol;
     final int worldHeight = tileSize * maxWorldRow;
 
     private Thread gameThread;
@@ -72,6 +72,7 @@ public class GameScreen extends JPanel implements Runnable {
                 boolean prev = menuBtnHovered;
                 menuBtnHovered = menuBtnRect != null && menuBtnRect.contains(e.getPoint());
                 if (prev != menuBtnHovered) repaint();
+
                 setCursor(menuBtnHovered
                         ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                         : Cursor.getDefaultCursor());
@@ -109,8 +110,14 @@ public class GameScreen extends JPanel implements Runnable {
             playerMp = 100;
             playerAtk = 26;
             playerDef = 2;
+        } else if ("Aya".equalsIgnoreCase(selectedCharacter) || "Archer".equalsIgnoreCase(selectedCharacter)) {
+            playerMaxHp = 100;
+            playerHp = 100;
+            playerMaxMp = 45;
+            playerMp = 45;
+            playerAtk = 18;
+            playerDef = 5;
         } else {
-            // fallback if "Archer" is selected but Aya.java does not exist
             playerMaxHp = 140;
             playerHp = 140;
             playerMaxMp = 20;
@@ -121,12 +128,35 @@ public class GameScreen extends JPanel implements Runnable {
         }
     }
 
+    public boolean isTileCollision(int x, int y, int width, int height) {
+        int leftCol   = Math.max(0, x / tileSize);
+        int rightCol  = Math.min(maxWorldCol - 1, (x + width - 1) / tileSize);
+        int topRow    = Math.max(0, y / tileSize);
+        int bottomRow = Math.min(maxWorldRow - 1, (y + height - 1) / tileSize);
+
+        for (int col = leftCol; col <= rightCol; col++) {
+            for (int row = topRow; row <= bottomRow; row++) {
+                int tileNum = tileM.mapTileNum[col][row];
+                if (tileNum >= 0 && tileNum < tileM.tile.length) {
+                    Tile tile = tileM.tile[tileNum];
+                    if (tile != null && tile.collision) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public void startGame() {
         new SwingWorker<Player, Void>() {
             @Override
             protected Player doInBackground() {
                 if ("Jakara".equalsIgnoreCase(selectedCharacter)) {
                     return new Jakara(GameScreen.this, keyH);
+                } else if ("Aya".equalsIgnoreCase(selectedCharacter) || "Archer".equalsIgnoreCase(selectedCharacter)) {
+                    return new Aya(GameScreen.this, keyH);
                 }
                 return new Ronnix(GameScreen.this, keyH);
             }

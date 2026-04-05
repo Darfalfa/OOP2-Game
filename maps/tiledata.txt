@@ -1,0 +1,6 @@
+000.jpg
+false
+001.jpg
+false
+002.jpg
+true

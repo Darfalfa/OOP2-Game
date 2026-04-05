@@ -174,10 +174,25 @@ public abstract class Player {
         boolean moving = up || down || left || right;
 
         // ── Movement ──────────────────────────────────────────────────────────────
-        if (up)    y -= speed;
-        if (down)  y += speed;
-        if (left)  x -= speed;
-        if (right) x += speed;
+        int nextX = x;
+        int nextY = y;
+
+        if (up)    nextY -= (int) speed;
+        if (down)  nextY += (int) speed;
+        if (left)  nextX -= (int) speed;
+        if (right) nextX += (int) speed;
+
+        if (!gp.isTileCollision(nextX, nextY, SPRITE_W, SPRITE_H)) {
+            x = nextX;
+            y = nextY;
+        } else {
+            if (!gp.isTileCollision(nextX, y, SPRITE_W, SPRITE_H)) {
+                x = nextX;
+            }
+            if (!gp.isTileCollision(x, nextY, SPRITE_W, SPRITE_H)) {
+                y = nextY;
+            }
+        }
 
         // ── World Boundary Clamping ───────────────────────────────────────────────
         if (x < 0) x = 0;
