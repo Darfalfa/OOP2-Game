@@ -1,4 +1,6 @@
+import Characters.Aya;
 import Characters.Character;
+import Characters.Jakara;
 import Characters.Ronnix;
 import java.awt.*;
 import java.awt.event.*;
@@ -47,6 +49,9 @@ public class BattleScreen extends JPanel {
     private boolean enemyShake = false;
     private boolean playerShake = false;
 
+    private float displayPlayerHp = 0;
+    private float displayEnemyHp = 0;
+
     private BufferedImage enemySprite;
     private BufferedImage playerSprite;
 
@@ -77,6 +82,10 @@ public class BattleScreen extends JPanel {
             }
 
             if (flashTicks > 0) flashTicks--;
+
+            displayPlayerHp += (playerCharacter.getHp() - displayPlayerHp) * 0.15f;
+            displayEnemyHp += (enemyCharacter.getHp() - displayEnemyHp) * 0.15f;
+
             repaint();
         });
     }
@@ -114,7 +123,12 @@ public class BattleScreen extends JPanel {
             case "ronnix":
                 playerCharacter = new Ronnix();
                 break;
-            // add cases for the other characters
+            case "aya":
+                playerCharacter = new Aya();
+                break;
+            case "jakara":
+                playerCharacter = new Jakara();
+                break;
             default:
                 playerCharacter = new Ronnix(); // fallback
                 break;
@@ -128,6 +142,9 @@ public class BattleScreen extends JPanel {
         this.onBattleEnd = onEnd;
         this.phase = Phase.PLAYER_TURN;
         this.playerWon = false;
+
+        displayPlayerHp = player.getHp();
+        displayEnemyHp = enemy.getHp();
 
         log.clear();
         addLog("A " + enemyCharacter.getName() + " appeared!");
@@ -219,8 +236,24 @@ public class BattleScreen extends JPanel {
     }
 
     private void doItems() {
-            addLog("No usable items yet.");
-            repaint();
+
+        String result;
+
+        if (playerCharacter.getHealthPotion() > 0) {
+            result = playerCharacter.useHealthPotion();
+        } else if (playerCharacter.getExpPotion() > 0) {
+            result = playerCharacter.useExpPotion();
+        } else {
+            addLog("No potions available!");
+            return;
+        }
+
+        for (String line : result.split("\n")) {
+            addLog(line);
+        }
+
+        repaint();
+        afterPlayerAction();
     }
 
     private void afterPlayerAction() {
@@ -458,6 +491,7 @@ public class BattleScreen extends JPanel {
         int offX = (playerShake && shakeTicks > 0) ? (int) shakeX : 0;
 
         boolean isRonnix = "Ronnix".equalsIgnoreCase(selectedCharacter);
+        boolean isAya = "Aya".equalsIgnoreCase(selectedCharacter);
         boolean isJakara = "Jakara".equalsIgnoreCase(selectedCharacter);
 
         if (playerSprite != null) {
@@ -515,12 +549,13 @@ public class BattleScreen extends JPanel {
     private void drawHpBars(Graphics2D g2, int W, int H) {
         if (playerCharacter == null || enemyCharacter == null) return;
 
-        drawStatBar(g2, W - 340, 30, 300, "ENEMY HP", enemyCharacter.getHp(), enemyCharacter.getMaxHp(), RED_HP);
+        drawStatBar(g2, W - 340, 30, 300, "ENEMY HP",
+                (int)displayEnemyHp, enemyCharacter.getMaxHp(), RED_HP);
 
         drawStatBar(g2, W - 340, 75, 300, "ENEMY DEF", enemyCharacter.getDefense(), enemyCharacter.getMaxDefense(), new Color(80, 120, 220));
 
         drawStatBar(g2, 40, 30, 300, "HP",
-            playerCharacter.getHp(), playerCharacter.getMaxHp(), GREEN_HP);
+                (int)displayPlayerHp, playerCharacter.getMaxHp(), GREEN_HP);
 
         drawStatBar(g2, 40, 75, 300, "DEF", playerCharacter.getDefense(), playerCharacter.getMaxDefense(), new Color(80, 120, 220));
 

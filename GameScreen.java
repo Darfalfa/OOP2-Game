@@ -1,6 +1,5 @@
+import Characters.*;
 import Characters.Character;
-import Characters.Ronnix;
-import Characters.Shadow;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
@@ -22,7 +21,7 @@ public class GameScreen extends JPanel implements Runnable {
     final int worldHeight = WorldBackground.tileH() * 2;
 
     private Thread gameThread;
-    private KeyHandler keyH = new KeyHandler();
+    private KeyHandler keyH;
     private Player player;
     private Camera camera;
     private WorldBackground worldBG;
@@ -41,20 +40,69 @@ public class GameScreen extends JPanel implements Runnable {
 
     private Rectangle menuBtnRect;
     private boolean menuBtnHovered = false;
+    private Rectangle buyHealthBtn = null;
+    private Rectangle sellHealthBtn = null;
+    private Rectangle buyExpBtn = null;
+    private Rectangle sellExpBtn = null;
+    private Rectangle exitBtn;
+    private Rectangle hoveredBtn = null;
+
+    // SHOP IMAGES
+    private Image shopBG;
+    private Image healthImg;
+    private Image expImg;
+    private Image coinImg;
+    private Image makoImg;
+    private Image makoBlinkImg;
+    private Image itemCardImg;
+    // BUTTON IMAGES
+    private Image buyBtnImg;
+    private Image buyBtnHoverImg;
+    private Image exitBtnImg;
+
 
     private boolean inBattle = false;
     private int postBattleCooldown = 0;
+
+    // SHOP SYSTEM
+    private boolean shopDialogueOpen = false;
+    private boolean shopOpen = false;
+    private boolean makoBlink = false;
+    private int blinkTimer = 0;
+
+    private int selectedOption = 0; // 0 = Shop, 1 = Close
+
+    // Prices
+    private final int HEALTH_PRICE = 5;
+    private final int EXP_PRICE = 5;
 
     public GameScreen(GameWindow window) {
         this.window = window;
         setBackground(Color.BLACK);
         setDoubleBuffered(true);
         setFocusable(true);
+
+        keyH = new KeyHandler(this);
         addKeyListener(keyH);
 
         worldBG = new WorldBackground();
         player  = new Player(this, keyH);
         camera  = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
+
+        try {
+            shopBG = new ImageIcon("images/Shop_UI.png").getImage();
+            healthImg = new ImageIcon("images/Health_potion.png").getImage();
+            expImg = new ImageIcon("images/EXP_potion.png").getImage();
+            coinImg = new ImageIcon("images/Coin.png").getImage();
+            makoImg = new ImageIcon("images/Mako.png").getImage();
+            makoBlinkImg = new ImageIcon("images/MakoBlink.png").getImage();
+            buyBtnImg = new ImageIcon("images/Shop_Button_Buy_Placeholder.png").getImage();
+            buyBtnHoverImg = new ImageIcon("images/Shop_Button_Clicked_Buy_Placeholder.png").getImage();
+            exitBtnImg = new ImageIcon("images/shop_button_exit_placeholder.png").getImage();
+            itemCardImg = new ImageIcon("images/Shop_Item_Placeholder.png").getImage();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         addMouseMotionListener(new MouseMotionAdapter() {
             @Override
@@ -65,6 +113,19 @@ public class GameScreen extends JPanel implements Runnable {
                 setCursor(menuBtnHovered
                     ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     : Cursor.getDefaultCursor());
+
+                if (shopOpen) {
+                    Point p = e.getPoint();
+                    hoveredBtn = null;
+
+                    if (buyHealthBtn != null && buyHealthBtn.contains(p)) hoveredBtn = buyHealthBtn;
+                    else if (sellHealthBtn != null && sellHealthBtn.contains(p)) hoveredBtn = sellHealthBtn;
+                    else if (buyExpBtn != null && buyExpBtn.contains(p)) hoveredBtn = buyExpBtn;
+                    else if (sellExpBtn != null && sellExpBtn.contains(p)) hoveredBtn = sellExpBtn;
+                    else if (exitBtn != null && exitBtn.contains(p)) hoveredBtn = exitBtn;
+
+                    repaint();
+                }
             }
         });
 
@@ -74,6 +135,58 @@ public class GameScreen extends JPanel implements Runnable {
                 if (menuBtnRect != null && menuBtnRect.contains(e.getPoint())) {
                     stopGame();
                     window.showMainMenu();
+                }
+
+                if (shopOpen) {
+
+                    Point p = e.getPoint();
+
+                    // BUY HEALTH
+                    if (buyHealthBtn != null && buyHealthBtn.contains(p)) {
+                        if (playerCharacter.getGold() >= HEALTH_PRICE) {
+                            playerCharacter.addGold(-HEALTH_PRICE);
+                            playerCharacter.setHealthPotion(
+                                    playerCharacter.getHealthPotion() + 1
+                            );
+                        }
+                    }
+
+                    // SELL HEALTH
+                    if (sellHealthBtn != null && sellHealthBtn.contains(p)) {
+                        if (playerCharacter.getHealthPotion() > 0) {
+                            playerCharacter.setHealthPotion(
+                                    playerCharacter.getHealthPotion() - 1
+                            );
+                            playerCharacter.addGold(HEALTH_PRICE);
+                        }
+                    }
+
+                    // BUY EXP
+                    if (buyExpBtn != null && buyExpBtn.contains(p)) {
+                        if (playerCharacter.getGold() >= EXP_PRICE) {
+                            playerCharacter.addGold(-EXP_PRICE);
+                            playerCharacter.setExpPotion(
+                                    playerCharacter.getExpPotion() + 1
+                            );
+                        }
+                    }
+
+                    // SELL EXP
+                    if (sellExpBtn != null && sellExpBtn.contains(p)) {
+                        if (playerCharacter.getExpPotion() > 0) {
+                            playerCharacter.setExpPotion(
+                                    playerCharacter.getExpPotion() - 1
+                            );
+                            playerCharacter.addGold(EXP_PRICE);
+                        }
+                    }
+
+                    // EXIT
+                    if (exitBtn != null && exitBtn.contains(p)) {
+                        shopOpen = false;
+                    }
+
+                    repaint();
                 }
             }
         });
@@ -86,7 +199,12 @@ public class GameScreen extends JPanel implements Runnable {
             case "ronnix":
                 playerCharacter = new Ronnix();
                 break;
-            // add test case for the other characters
+            case "aya":
+                playerCharacter = new Aya();
+                break;
+            case "jakara":
+                playerCharacter = new Jakara();
+                break;
             default:
                 playerCharacter = new Ronnix(); // fallback
                 break;
@@ -198,6 +316,13 @@ public class GameScreen extends JPanel implements Runnable {
                 return;
             }
         }
+
+        blinkTimer++;
+
+        if (blinkTimer > 120) { // every ~2 seconds
+            makoBlink = !makoBlink;
+            blinkTimer = 0;
+        }
     }
 
     private void triggerBattle(Enemy enemy) {
@@ -209,6 +334,75 @@ public class GameScreen extends JPanel implements Runnable {
         SwingUtilities.invokeLater(() -> window.showBattle(enemy, battleEnemy, this));
     }
 
+    public void openShopDialogue() {
+        if (!shopOpen && !shopDialogueOpen) {
+            shopDialogueOpen = true;
+            selectedOption = 0;
+            repaint();
+        }
+    }
+
+    public void handleShopInput(int keyCode) {
+        if (playerCharacter == null) return;
+        // ===== DIALOGUE =====
+        if (shopDialogueOpen) {
+            if (keyCode == KeyEvent.VK_UP || keyCode == KeyEvent.VK_DOWN) {
+                selectedOption = 1 - selectedOption;
+            }
+            if (keyCode == KeyEvent.VK_ENTER) {
+                if (selectedOption == 0) {
+                    shopDialogueOpen = false;
+                    shopOpen = true;
+                } else {
+                    shopDialogueOpen = false;
+                }
+            }
+        }
+        // ===== SHOP =====
+        else if (shopOpen) {
+            // BUY HEALTH
+            if (keyCode == KeyEvent.VK_1) {
+                if (playerCharacter.getGold() >= HEALTH_PRICE) {
+                    playerCharacter.addGold(-HEALTH_PRICE);
+                    playerCharacter.setHealthPotion(
+                            playerCharacter.getHealthPotion() + 1
+                    );
+                }
+            }
+            // BUY EXP
+            if (keyCode == KeyEvent.VK_2) {
+                if (playerCharacter.getGold() >= EXP_PRICE) {
+                    playerCharacter.addGold(-EXP_PRICE);
+                    playerCharacter.setExpPotion(
+                            playerCharacter.getExpPotion() + 1
+                    );
+                }
+            }
+            // SELL HEALTH
+            if (keyCode == KeyEvent.VK_Q) {
+                if (playerCharacter.getHealthPotion() > 0) {
+                    playerCharacter.setHealthPotion(
+                            playerCharacter.getHealthPotion() - 1
+                    );
+                    playerCharacter.addGold(HEALTH_PRICE);
+                }
+            }
+            // SELL EXP
+            if (keyCode == KeyEvent.VK_W) {
+                if (playerCharacter.getExpPotion() > 0) {
+                    playerCharacter.setExpPotion(
+                            playerCharacter.getExpPotion() - 1
+                    );
+                    playerCharacter.addGold(EXP_PRICE);
+                }
+            }
+            // EXIT SHOP
+            if (keyCode == KeyEvent.VK_ESCAPE) {
+                shopOpen = false;
+            }
+        }
+        repaint();
+    }
     
 
     @Override
@@ -225,9 +419,177 @@ public class GameScreen extends JPanel implements Runnable {
         player.draw(g2, camera);
         drawHUD(g2);
 
+        // DRAW SHOP DIALOGUE
+        if (shopDialogueOpen) {
+            drawShopDialogue(g2);
+        }
+
+        // DRAW SHOP
+        if (shopOpen) {
+            drawShop(g2);
+        }
+
         g2.dispose();
 
         
+    }
+
+    private void drawShopDialogue(Graphics2D g2) {
+        int w = 600;
+        int h = 200;
+
+        int x = (getWidth() - w) / 2;
+        int y = getHeight() - h - 40;
+
+        g2.setColor(new Color(20, 20, 40, 230));
+        g2.fillRoundRect(x, y, w, h, 20, 20);
+
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(x, y, w, h, 20, 20);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 16));
+
+        g2.drawString("*Yawn* Yeah ... welcome to the tavern.", x + 20, y + 40);
+        g2.drawString("If you're here for potions,", x + 20, y + 70);
+        g2.drawString("they're on the table. *yawn*", x + 20, y + 100);
+
+        g2.setFont(new Font("Arial", Font.BOLD, 18));
+
+        g2.setColor(selectedOption == 0 ? Color.YELLOW : Color.WHITE);
+        g2.drawString("Shop", x + 120, y + 150);
+
+        g2.setColor(selectedOption == 1 ? Color.YELLOW : Color.WHITE);
+        g2.drawString("Close", x + 240, y + 150);
+    }
+
+    private void drawShop(Graphics2D g2) {
+
+        if (playerCharacter == null) return;
+
+        int screenW = getWidth();
+        int screenH = getHeight();
+
+        // ===== BACKGROUND =====
+        g2.drawImage(shopBG, 0, 0, screenW, screenH, null);
+
+        // ===== MAKO =====
+        Image makoToDraw = makoBlink ? makoBlinkImg : makoImg;
+        g2.drawImage(makoToDraw, 60, screenH - 510, 350, 350, null);
+
+        // ===== GOLD =====
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.BOLD, 20));
+        g2.drawImage(coinImg, 20, 20, 30, 30, null);
+        g2.drawString(String.valueOf(playerCharacter.getGold()), 60, 45);
+
+        // ===== ITEM CARDS =====
+        int cardY = 120;
+
+        // CARD SETTINGS
+        int cardWidth = 260;
+        int spacing = 40;
+
+        // TOTAL WIDTH of both cards
+        int totalWidth = (cardWidth * 2) + spacing;
+
+        // START POSITION (adjust this to move left/right)
+        int startX = (screenW - totalWidth) / 2 + 120;
+
+        // FINAL POSITIONS
+        int leftX = startX;
+        int rightX = startX + cardWidth + spacing;
+
+        drawItemCard(g2, leftX, cardY, true);
+        drawItemCard(g2, rightX, cardY, false);
+
+        // ===== EXIT BUTTON =====
+        exitBtn = new Rectangle(160, screenH - 100, 150, 60);
+        g2.drawImage(exitBtnImg, exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, null);
+
+        g2.setFont(new Font("Arial", Font.BOLD, 16));
+        g2.setColor(Color.WHITE);
+        g2.drawString("EXIT", exitBtn.x + 50, exitBtn.y + 35);
+    }
+
+    private void drawItemCard(Graphics2D g2, int x, int y, boolean isHealth) {
+
+        int w = 260;
+        int h = 360;
+
+        // Card background
+        g2.drawImage(itemCardImg, x, y, w, h, null);
+
+        Image icon = isHealth ? healthImg : expImg;
+
+        int owned = isHealth
+                ? playerCharacter.getHealthPotion()
+                : playerCharacter.getExpPotion();
+
+        int price = isHealth ? HEALTH_PRICE : EXP_PRICE;
+
+        String name = isHealth ? "Health Potion" : "EXP Potion";
+        String desc = isHealth
+                ? "Restores 50 HP\nPerfect for survival."
+                : "Grants 50 EXP\nBoost progression.";
+
+        // ICON
+        g2.drawImage(icon, x + 80, y + 50, 80, 80, null);
+
+        // NAME
+        g2.setFont(new Font("Arial", Font.BOLD, 16));
+        g2.setColor(Color.WHITE);
+        FontMetrics fm = g2.getFontMetrics();
+        int nameX = x + (w - fm.stringWidth(name)) / 2;
+        g2.drawString(name, nameX, y + 155);
+
+        // DESCRIPTION
+        g2.setFont(new Font("Arial", Font.PLAIN, 12));
+        drawMultiline(g2, desc, x + 40, y + 180);
+
+        // Price (left side)
+        g2.drawImage(coinImg, x + 40, y + 300, 20, 20, null);
+        g2.drawString(String.valueOf(price), x + 70, y + 315);
+
+        // Owned (right side)
+        g2.drawString("Owned: " + owned, x + 165, y + 315);
+
+        // BUTTONS
+        Rectangle buy = new Rectangle(x + 20, y + 400, 220, 45);
+        Rectangle sell = new Rectangle(x + 20, y + 450, 220, 45);
+
+        if (isHealth) {
+            buyHealthBtn = buy;
+            sellHealthBtn = sell;
+        } else {
+            buyExpBtn = buy;
+            sellExpBtn = sell;
+        }
+
+        drawButton(g2, buy, "BUY");
+        drawButton(g2, sell, "SELL");
+    }
+
+    private void drawMultiline(Graphics2D g2, String text, int x, int y) {
+        for (String line : text.split("\n")) {
+            g2.drawString(line, x, y);
+            y += 15;
+        }
+    }
+
+    private void drawButton(Graphics2D g2, Rectangle rect, String text) {
+
+        Image img = (rect == hoveredBtn) ? buyBtnHoverImg : buyBtnImg;
+
+        g2.drawImage(img, rect.x, rect.y, rect.width, rect.height, null);
+
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.BOLD, 14));
+
+        FontMetrics fm = g2.getFontMetrics();
+        int tx = rect.x + (rect.width - fm.stringWidth(text)) / 2;
+        int ty = rect.y + (rect.height + fm.getAscent()) / 2 - 4;
+
+        g2.drawString(text, tx, ty);
     }
 
     private void drawHUD(Graphics2D g2) {

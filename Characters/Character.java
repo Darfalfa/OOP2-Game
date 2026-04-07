@@ -10,11 +10,12 @@ abstract public class Character {
     private int hp, maxHp, baseHp;
     private int defense, maxDefense, baseDefense;
     private int level;
-    private int potionCount = 0;
     private int baseExp;
     private int currentXp = 0;
     private int nextLevelXp;
     private int gold;
+    private int healthPotion = 0;
+    private int expPotion = 0;
 
     public String RESET = "\033[0m";
     public String RED = "\033[31m";
@@ -63,6 +64,11 @@ abstract public class Character {
         return gold;
     }
 
+    public void addGold(int amount) {
+        gold += amount;
+        if (gold < 0) gold = 0;
+    }
+
     private void levelUp() {
         level++;
         recalcStats();
@@ -90,14 +96,6 @@ abstract public class Character {
         return level;
     }
 
-    public int getPotionCount() {
-        return potionCount;
-    }
-
-    public void setPotionCount(int potionCount) {
-        this.potionCount = potionCount;
-    }
-
     public int getCurrentXp() {
         return currentXp;
     }
@@ -120,6 +118,22 @@ abstract public class Character {
 
     public int[] getSkillCooldowns() {
         return skillCooldowns;
+    }
+
+    public int getHealthPotion() {
+        return healthPotion;
+    }
+
+    public void setHealthPotion(int val) {
+        healthPotion = val;
+    }
+
+    public int getExpPotion() {
+        return expPotion;
+    }
+
+    public void setExpPotion(int val) {
+        expPotion = val;
     }
 
     public void setHp(int hp) {
@@ -157,20 +171,6 @@ abstract public class Character {
             hp = 0;
 
         return dmg;
-    }
-
-    public void usePotion() {
-        if (potionCount > 0) {
-            int missingHp = maxHp - hp;
-            int healed = (int)(missingHp * 0.30);
-            setHp(hp + healed);
-            System.out.println(BLUE + name + RESET + " uses " + PURPLE + "HP Potion" + RESET + "! Restores " + GREEN + healed + " HP" + RESET + "!");
-            potionCount--;
-            System.out.println(BLUE + name + RESET + " has " + GREEN + hp + " HP remaining!" + RESET);
-            System.out.println(YELLOW + "Potions left: " + potionCount + RESET);
-        } else {
-            System.out.println(RED + "No potions left!" + RESET);
-        }
     }
 
     public boolean isSkillAvailable(int skillNumber) {
@@ -220,6 +220,42 @@ abstract public class Character {
         System.out.println("Lost " + loss + " XP (" + (int)(percent * 100) + "%)");
 
         return loss;
+    }
+
+    public String useHealthPotion() {
+
+        if (healthPotion > 0) {
+            int missingHp = maxHp - hp;
+            int healAmount = (int)(missingHp * 0.30);
+
+            setHp(Math.min(hp + healAmount, maxHp));
+
+            healthPotion--;
+
+            return name + " uses HP Potion!"
+                    + "\nRestored " + healAmount + " HP."
+                    + "\nPotions left: " + healthPotion;
+
+        } else {
+            return "No HP potions left!";
+        }
+    }
+
+    public String useExpPotion() {
+
+        if (expPotion > 0) {
+
+            int gained = (int)(getNextLevelXp() * (0.15 + Math.random() * 0.10));
+
+            gainXp(gained);
+            expPotion--;
+
+            return name + " uses EXP Potion! Gained " + gained + " EXP.\n"
+                    + "Potions left: " + expPotion;
+
+        } else {
+            return "No EXP potions left!";
+        }
     }
 
     public abstract int useSkill(int skillNumber, Character enemy);

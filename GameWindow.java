@@ -21,7 +21,7 @@ public class GameWindow extends JFrame {
     private GameScreen gameScreen;
     private BattleScreen battleScreen;
 
-    private String selectedCharacter = "Ronnix";
+    private String selectedCharacter;
 
     public GameWindow() {
         setTitle("Great Ruins of Khai");

@@ -3,10 +3,16 @@ import java.awt.event.KeyListener;
 
 public class KeyHandler implements KeyListener {
 
+    private GameScreen gameScreen;
+
     public boolean upPressed;
     public boolean downPressed;
     public boolean leftPressed;
     public boolean rightPressed;
+
+    public KeyHandler(GameScreen gameScreen) {
+        this.gameScreen = gameScreen;
+    }
 
     @Override
     public void keyTyped(KeyEvent e) {}
@@ -20,6 +26,12 @@ public class KeyHandler implements KeyListener {
         if (code == KeyEvent.VK_S) downPressed = true;
         if (code == KeyEvent.VK_A) leftPressed = true;
         if (code == KeyEvent.VK_D) rightPressed = true;
+
+        gameScreen.handleShopInput(e.getKeyCode());
+
+        if (e.getKeyCode() == KeyEvent.VK_E) {
+            gameScreen.openShopDialogue();
+        }
     }
 
     @Override

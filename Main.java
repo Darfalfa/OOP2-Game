@@ -7,4 +7,4 @@ public class Main {
             window.showMainMenu(); // ← go straight to main menu on startup
         });
     }
-}
+}//test

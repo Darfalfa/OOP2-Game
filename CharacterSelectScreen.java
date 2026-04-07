@@ -36,10 +36,10 @@ public class CharacterSelectScreen extends JPanel {
     private boolean   backHovered = false;
 
     // Character stat bars (HP, MP, ATK, DEF) out of 10
-    private static final String[] CHAR_NAMES = { "ARCHER", "RONNIX", "JAKARA" };
-    private static final String[] CHAR_CLASS = { "Ranger", "Fighter", "Arcane Mage" };
+    private static final String[] CHAR_NAMES = { "AYA", "RONNIX", "JAKARA" };
+    private static final String[] CHAR_CLASS = { "Archer", "Fighter", "Arcane Mage" };
     private static final int[][] CHAR_STATS  = {
-        { 7, 8, 6, 5 },   // Archer
+        { 7, 8, 6, 5 },   // Aya
         { 9, 4, 9, 8 },   // Ronnix
         { 5, 10, 9, 3 }   // Jakara
     };
@@ -82,7 +82,7 @@ public class CharacterSelectScreen extends JPanel {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (archerRect != null && archerRect.contains(e.getPoint())) {
-                    window.setSelectedCharacter("Archer");
+                    window.setSelectedCharacter("Aya");
                     window.showGame();
                     return;
                 }
@@ -308,7 +308,7 @@ public class CharacterSelectScreen extends JPanel {
 
         g2.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 13));
         g2.setColor(accent);
-        String tag = isRonnix ? "RONNIX" : isJakara ? "JAKARA" : "ARCHER";
+        String tag = isRonnix ? "RONNIX" : isJakara ? "JAKARA" : "AYA";
         FontMetrics fm = g2.getFontMetrics();
         g2.drawString(tag, x + (size - fm.stringWidth(tag)) / 2, y + size - 8);
     }
