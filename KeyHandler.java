@@ -32,6 +32,8 @@ public class KeyHandler implements KeyListener {
         if (e.getKeyCode() == KeyEvent.VK_E) {
             gameScreen.openShopDialogue();
         }
+
+        gameScreen.handleInfoInput(code);
     }
 
     @Override

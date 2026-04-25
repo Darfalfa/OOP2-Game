@@ -7,45 +7,59 @@ import java.util.List;
 import javax.swing.*;
 
 /**
- * GameScreen — the live game view embedded in the CardLayout window.
- * Contains the game loop, player, camera, world background, and enemies.
+ * GameScreen — gameplay panel adapted to your current project structure.
+ * Uses map.txt + tiledata.txt + tile images from your tiles folder.
  */
 public class GameScreen extends JPanel implements Runnable {
 
     private GameWindow window;
 
-    static final int SCREEN_WIDTH  = GameWindow.WIDTH;
-    static final int SCREEN_HEIGHT = GameWindow.HEIGHT;
+    public static final int SCREEN_WIDTH  = GameWindow.WIDTH;
+    public static final int SCREEN_HEIGHT = GameWindow.HEIGHT;
 
-    final int worldWidth  = WorldBackground.tileW() * 3;
-    final int worldHeight = WorldBackground.tileH() * 2;
+    // tile settings
+    final int originalTileSize = 16;
+    final int scale = 3;
+    public final int tileSize = originalTileSize * scale; // 48
+
+    // world settings
+    public int maxWorldCol = 50;
+    public int maxWorldRow = 50;
+    final int worldWidth = tileSize * maxWorldCol;
+    final int worldHeight = tileSize * maxWorldRow;
 
     private Thread gameThread;
     private KeyHandler keyH;
     private Player player;
     private Camera camera;
-    private WorldBackground worldBG;
+    private TileManager tileM;
 
-    private List<Enemy> enemies = new ArrayList<>();
-    private static final int ENEMY_COUNT = 5;
+    // enemies
+    private final List<Enemy> enemies = new ArrayList<>();
+    private static final int ENEMY_COUNT = 10;
 
-    // Only store the selected playable battle character here
     private Character playerCharacter;
 
     private String selectedCharacter;
 
+
+    // hud
     private static final Color GOLD       = new Color(201, 150, 58);
     private static final Color GOLD_LIGHT = new Color(240, 192, 96);
     private static final Color GOLD_DARK  = new Color(100, 65, 15);
 
     private Rectangle menuBtnRect;
     private boolean menuBtnHovered = false;
+
+    private boolean infoOpen = false;
+
     private Rectangle buyHealthBtn = null;
     private Rectangle sellHealthBtn = null;
     private Rectangle buyExpBtn = null;
     private Rectangle sellExpBtn = null;
     private Rectangle exitBtn;
     private Rectangle hoveredBtn = null;
+    private Rectangle expPotionBtn;
 
     // SHOP IMAGES
     private Image shopBG;
@@ -59,7 +73,6 @@ public class GameScreen extends JPanel implements Runnable {
     private Image buyBtnImg;
     private Image buyBtnHoverImg;
     private Image exitBtnImg;
-
 
     private boolean inBattle = false;
     private int postBattleCooldown = 0;
@@ -81,13 +94,12 @@ public class GameScreen extends JPanel implements Runnable {
         setBackground(Color.BLACK);
         setDoubleBuffered(true);
         setFocusable(true);
-
+        
         keyH = new KeyHandler(this);
         addKeyListener(keyH);
 
-        worldBG = new WorldBackground();
-        player  = new Player(this, keyH);
-        camera  = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
+        camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
+        tileM = new TileManager(this);
 
         try {
             shopBG = new ImageIcon("images/Shop_UI.png").getImage();
@@ -185,11 +197,25 @@ public class GameScreen extends JPanel implements Runnable {
                     if (exitBtn != null && exitBtn.contains(p)) {
                         shopOpen = false;
                     }
+                    repaint();
+                }
+
+                // ===== EXP POTION BUTTON (always clickable) =====
+                if (expPotionBtn != null && expPotionBtn.contains(e.getPoint())) {
+                    if (playerCharacter.getExpPotion() > 0) {
+
+                        String result = playerCharacter.useExpPotion();
+                        System.out.println(result);
+
+                    } else {
+                        System.out.println("No EXP potions!");
+                    }
 
                     repaint();
                 }
             }
         });
+
     }
 
     public void setSelectedCharacter(String name) {
@@ -197,18 +223,19 @@ public class GameScreen extends JPanel implements Runnable {
 
         switch (name.toLowerCase()) {
             case "ronnix":
-                playerCharacter = new Ronnix();
+                playerCharacter = new RonnixLogic();
+                player = new Ronnix(this, keyH);
                 break;
             case "aya":
-                playerCharacter = new Aya();
+                playerCharacter = new AyaLogic();
+                player = new Aya(this, keyH);
                 break;
             case "jakara":
-                playerCharacter = new Jakara();
-                break;
-            default:
-                playerCharacter = new Ronnix(); // fallback
+                playerCharacter = new JakaraLogic();
+                player = new Jakara(this, keyH);
                 break;
         }
+
         repaint();
     }
 
@@ -216,23 +243,46 @@ public class GameScreen extends JPanel implements Runnable {
         return playerCharacter;
     }
 
-    public void startGame() {
-        player.x = worldWidth / 2;
-        player.y = worldHeight / 2;
+    public boolean isTileCollision(int x, int y, int width, int height) {
+        int leftCol   = Math.max(0, x / tileSize);
+        int rightCol  = Math.min(maxWorldCol - 1, (x + width - 1) / tileSize);
+        int topRow    = Math.max(0, y / tileSize);
+        int bottomRow = Math.min(maxWorldRow - 1, (y + height - 1) / tileSize);
 
-        if (playerCharacter == null) {
-            setSelectedCharacter(selectedCharacter);
+        for (int col = leftCol; col <= rightCol; col++) {
+            for (int row = topRow; row <= bottomRow; row++) {
+                int tileNum = tileM.mapTileNum[col][row];
+                if (tileNum >= 0 && tileNum < tileM.tile.length) {
+                    Tile tile = tileM.tile[tileNum];
+                    if (tile != null && tile.collision) {
+                        return true;
+                    }
+                }
+            }
         }
 
-        spawnEnemies();
-
-        requestFocusInWindow();
-        if (gameThread == null || !gameThread.isAlive()) {
-            gameThread = new Thread(this);
-            gameThread.setDaemon(true);
-            gameThread.start();
-        }
+        return false;
     }
+
+    public void startGame() {
+
+    player.x = worldWidth / 2;
+    player.y = worldHeight / 2;
+
+    if (playerCharacter == null) {
+        setSelectedCharacter(selectedCharacter);
+    }
+
+    spawnEnemies();
+
+    requestFocusInWindow();
+
+    if (gameThread == null || !gameThread.isAlive()) {
+        gameThread = new Thread(this);
+        gameThread.setDaemon(true);
+        gameThread.start();
+    }
+}
 
     public void stopGame() {
         gameThread = null;
@@ -247,7 +297,7 @@ public class GameScreen extends JPanel implements Runnable {
                 ey = 200 + (int)(Math.random() * (worldHeight - 400));
             } while (Math.hypot(ex - player.x, ey - player.y) < 300);
 
-            enemies.add(new Enemy(ex, ey, new Shadow()));
+            enemies.add(new Enemy(ex, ey, new ShadowLogic()));
         }
     }
 
@@ -257,6 +307,7 @@ public class GameScreen extends JPanel implements Runnable {
 
         if (won) {
             defeated.defeated = true;
+            defeated.respawnTimer = 300; // ~5 seconds
         } else {
             // Push player away a bit after losing so battle doesn't instantly retrigger
             player.x = Math.max(0, player.x - 100);
@@ -265,7 +316,10 @@ public class GameScreen extends JPanel implements Runnable {
 
         SwingUtilities.invokeLater(() -> {
             window.showGameScreen();
-            requestFocusInWindow();
+
+            GameScreen.this.requestFocusInWindow();
+
+            GameScreen.this.requestFocus();
 
             if (gameThread == null || !gameThread.isAlive()) {
                 gameThread = new Thread(this);
@@ -307,11 +361,35 @@ public class GameScreen extends JPanel implements Runnable {
         camera.update(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
 
         for (Enemy enemy : enemies) {
-            if (enemy.defeated) continue;
+
+            // ===== RESPAWN LOGIC =====
+            if (enemy.defeated) {
+
+                enemy.respawnTimer--;
+
+                if (enemy.respawnTimer <= 0) {
+
+                    enemy.defeated = false;
+
+                    // restore enemy stats
+                    enemy.character.restoreStats();
+
+                    // respawn in random location (not near player)
+                    do {
+                        enemy.x = 200 + (int)(Math.random() * (worldWidth - 400));
+                        enemy.y = 200 + (int)(Math.random() * (worldHeight - 400));
+                    } while (Math.hypot(enemy.x - player.x, enemy.y - player.y) < 250);
+                }
+
+                continue;
+            }
+
+            // ===== NORMAL BEHAVIOR =====
             enemy.update(worldWidth, worldHeight);
 
             if (postBattleCooldown == 0 &&
-                enemy.isNearPlayer(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H)) {
+                    enemy.isNearPlayer(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H)) {
+
                 triggerBattle(enemy);
                 return;
             }
@@ -403,20 +481,28 @@ public class GameScreen extends JPanel implements Runnable {
         }
         repaint();
     }
-    
+
+    public void handleInfoInput(int keyCode) {
+        if (keyCode == KeyEvent.VK_I) {
+            infoOpen = !infoOpen;
+        }
+    }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
-        worldBG.draw(g2, camera, worldWidth, worldHeight);
+        tileM.draw(g2, camera);
 
         for (Enemy enemy : enemies) {
             enemy.draw(g2, camera);
         }
 
-        player.draw(g2, camera);
+        if (player != null) {
+            player.draw(g2, camera);
+        }
+
         drawHUD(g2);
 
         // DRAW SHOP DIALOGUE
@@ -429,9 +515,11 @@ public class GameScreen extends JPanel implements Runnable {
             drawShop(g2);
         }
 
-        g2.dispose();
+        if (infoOpen) {
+            drawInfoWindow(g2);
+        }
 
-        
+        g2.dispose();
     }
 
     private void drawShopDialogue(Graphics2D g2) {
@@ -529,8 +617,8 @@ public class GameScreen extends JPanel implements Runnable {
 
         String name = isHealth ? "Health Potion" : "EXP Potion";
         String desc = isHealth
-                ? "Restores 50 HP\nPerfect for survival."
-                : "Grants 50 EXP\nBoost progression.";
+                ? "Restores 30% of the missing HP\nPerfect for survival."
+                : "Grants 15%–25% EXP needed for next level.\nSpeeds up leveling.";
 
         // ICON
         g2.drawImage(icon, x + 80, y + 50, 80, 80, null);
@@ -544,7 +632,7 @@ public class GameScreen extends JPanel implements Runnable {
 
         // DESCRIPTION
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        drawMultiline(g2, desc, x + 40, y + 180);
+        drawWrappedText(g2, desc, x + 40, y + 180, 180);
 
         // Price (left side)
         g2.drawImage(coinImg, x + 40, y + 300, 20, 20, null);
@@ -569,11 +657,167 @@ public class GameScreen extends JPanel implements Runnable {
         drawButton(g2, sell, "SELL");
     }
 
-    private void drawMultiline(Graphics2D g2, String text, int x, int y) {
-        for (String line : text.split("\n")) {
-            g2.drawString(line, x, y);
-            y += 15;
+    private int drawWrappedText(Graphics2D g2, String text, int x, int y, int maxWidth) {
+
+        FontMetrics fm = g2.getFontMetrics();
+        int lineHeight = fm.getHeight();
+        int startY = y;
+
+        String[] lines = text.split("\n");
+
+        for (String rawLine : lines) {
+
+            String[] words = rawLine.split(" ");
+            String line = "";
+
+            for (String word : words) {
+                String testLine = line + word + " ";
+                int testWidth = fm.stringWidth(testLine);
+
+                if (testWidth > maxWidth) {
+                    g2.drawString(line, x, y);
+                    line = word + " ";
+                    y += lineHeight;
+                } else {
+                    line = testLine;
+                }
+            }
+
+            if (!line.isEmpty()) {
+                g2.drawString(line, x, y);
+                y += lineHeight;
+            }
         }
+
+        return y - startY;
+    }
+
+    private void drawInfoWindow(Graphics2D g2) {
+
+        if (playerCharacter == null) return;
+
+        int w = 600;
+
+        int padding = 40;
+        int maxTextWidth = w - padding * 2;
+
+        // ===== MEASURE FIRST =====
+        g2.setFont(new Font("Arial", Font.PLAIN, 16));
+        int bgTextHeight = measureWrappedText(
+                g2,
+                playerCharacter.getBackgroundInfo(),
+                maxTextWidth
+        );
+
+        // calculate total height
+        int h = 120
+                + bgTextHeight
+                + 20
+                + 30
+                + (3 * 50)
+                + 20
+                + 80
+                + 40;
+
+        // clamp to screen
+        h = Math.min(h, getHeight() - 80);
+
+        int x = (getWidth() - w) / 2;
+        int y = (getHeight() - h) / 2;
+
+        // ===== DRAW BOX =====
+        g2.setColor(new Color(20, 20, 40, 230));
+        g2.fillRoundRect(x, y, w, h, 20, 20);
+
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(x, y, w, h, 20, 20);
+
+        // ===== TITLE =====
+        g2.setFont(new Font("Arial", Font.BOLD, 22));
+        g2.drawString(playerCharacter.getName(), x + 20, y + 40);
+
+        // ===== BACKGROUND =====
+        int bgX = x + 20;
+        int bgY = y + 80;
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 16));
+        g2.drawString("Background", bgX, bgY);
+
+        int textHeight = drawWrappedText(
+                g2,
+                playerCharacter.getBackgroundInfo(),
+                bgX,
+                bgY + 20,
+                maxTextWidth
+        );
+
+        // ===== SKILLS =====
+        int skillX = x + 20;
+        int skillY = bgY + 20 + textHeight + 20;
+
+        g2.setFont(new Font("Arial", Font.BOLD, 16));
+        g2.drawString("Skills", skillX, skillY);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 14));
+
+        int yOffset = skillY + 30;
+
+        for (int i = 1; i <= 3; i++) {
+            String name = playerCharacter.getSkillName(i);
+            String dmg  = playerCharacter.getSkillDamageRange(i);
+
+            g2.drawString(i + ": " + name, skillX, yOffset);
+            g2.drawString("DMG: " + dmg, skillX, yOffset + 18);
+
+            yOffset += 50;
+        }
+
+        // ===== ITEMS =====
+        int itemY = yOffset + 10;
+
+        g2.setFont(new Font("Arial", Font.BOLD, 16));
+        g2.drawString("Items", x + 20, itemY);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 14));
+        g2.drawString("HP Potion: " + playerCharacter.getHealthPotion(), x + 20, itemY + 30);
+        g2.drawString("EXP Potion: " + playerCharacter.getExpPotion(), x + 20, itemY + 55);
+
+        // ===== CLOSE =====
+        g2.setFont(new Font("Arial", Font.ITALIC, 12));
+        g2.drawString("Press I to close", x + w - 140, y + h - 20);
+    }
+
+    private int measureWrappedText(Graphics2D g2, String text, int maxWidth) {
+
+        FontMetrics fm = g2.getFontMetrics();
+        int lineHeight = fm.getHeight();
+        int totalHeight = 0;
+
+        String[] lines = text.split("\n");
+
+        for (String rawLine : lines) {
+
+            String[] words = rawLine.split(" ");
+            String line = "";
+
+            for (String word : words) {
+                String testLine = line + word + " ";
+                int testWidth = fm.stringWidth(testLine);
+
+                if (testWidth > maxWidth) {
+                    totalHeight += lineHeight;
+                    line = word + " ";
+                } else {
+                    line = testLine;
+                }
+            }
+
+            if (!line.isEmpty()) {
+                totalHeight += lineHeight;
+            }
+        }
+
+        return totalHeight;
     }
 
     private void drawButton(Graphics2D g2, Rectangle rect, String text) {
@@ -636,16 +880,30 @@ public class GameScreen extends JPanel implements Runnable {
                     playerCharacter.getDefense(), playerCharacter.getMaxDefense(),
                     new Color(80, 120, 220));
 
-            // EXP (NEW)
+            // EXP
             drawHudBar(g2, 16, baseY + 62, 200, "EXP",
                     playerCharacter.getCurrentXp(),
                     playerCharacter.getNextLevelXp(),
                     new Color(220, 180, 60));
+
+            int btnSize = 22;
+            int btnX = 16 + 200 + 10;
+            int btnY = baseY + 62;
+
+            expPotionBtn = new Rectangle(btnX, btnY, btnSize, btnSize);
+
+            g2.setColor(new Color(50, 50, 70));
+            g2.fillRoundRect(btnX, btnY, btnSize, btnSize, 6, 6);
+
+            g2.setColor(Color.WHITE);
+            g2.drawRoundRect(btnX, btnY, btnSize, btnSize, 6, 6);
+
+            g2.setFont(new Font("Arial", Font.BOLD, 16));
+            g2.drawString("+", btnX + 7, btnY + 16);
         }
     }
 
-    private void drawHudBar(Graphics2D g2, int x, int y, int w,
-                            String label, int cur, int max, Color fill) {
+    private void drawHudBar(Graphics2D g2, int x, int y, int w, String label, int cur, int max, Color fill) {
         int h = 20;
         double pct = max <= 0 ? 0 : (double) cur / max;
 
@@ -667,6 +925,11 @@ public class GameScreen extends JPanel implements Runnable {
         g2.drawString(label + ": " + cur + "/" + max, x + 8, y + h - 4);
     }
 
-    public int getWorldWidth()  { return worldWidth; }
-    public int getWorldHeight() { return worldHeight; }
+    public int getWorldWidth() {
+        return worldWidth;
+    }
+
+    public int getWorldHeight() {
+        return worldHeight;
+    }
 }

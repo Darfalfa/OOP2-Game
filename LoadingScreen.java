@@ -57,6 +57,7 @@ public class LoadingScreen extends JPanel {
 
     private float    progress = 0f;
     private Runnable onLoadComplete;
+    private boolean  callbackFired = false;
 
     private static final Color GOLD       = new Color(201, 150,  58);
     private static final Color GOLD_LIGHT = new Color(240, 192,  96);
@@ -81,6 +82,10 @@ public class LoadingScreen extends JPanel {
         progress = 0f;
         currentFrame = 0;
         blinkOn = true;
+        callbackFired = false;
+        // Stop any previously running timers before restarting
+        spriteTimer.stop();
+        progressTimer.stop();
         spriteTimer.start();
         progressTimer.start();
     }
@@ -119,7 +124,8 @@ public class LoadingScreen extends JPanel {
             } else {
                 progressTimer.stop();
                 spriteTimer.stop();
-                if (onLoadComplete != null) {
+                if (onLoadComplete != null && !callbackFired) {
+                    callbackFired = true;
                     SwingUtilities.invokeLater(onLoadComplete);
                 }
             }

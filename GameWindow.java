@@ -8,7 +8,7 @@ public class GameWindow extends JFrame {
     public static final int HEIGHT = 720;
 
     private CardLayout cardLayout;
-    private JPanel root;
+    private JPanel     root;
 
     public static final String SCREEN_LOADING   = "LOADING";
     public static final String SCREEN_MAIN      = "MAIN";
@@ -18,8 +18,8 @@ public class GameWindow extends JFrame {
     public static final String SCREEN_BATTLE    = "BATTLE";
 
     private LoadingScreen loadingScreen;
-    private GameScreen gameScreen;
-    private BattleScreen battleScreen;
+    private GameScreen    gameScreen;
+    private BattleScreen  battleScreen;
 
     private String selectedCharacter;
 
@@ -50,6 +50,7 @@ public class GameWindow extends JFrame {
         setVisible(true);
     }
 
+    /** Called by CharacterSelectScreen when the player picks a character. */
     public void setSelectedCharacter(String name) {
         this.selectedCharacter = name;
         battleScreen.setSelectedCharacter(name);
@@ -59,12 +60,17 @@ public class GameWindow extends JFrame {
     public String getSelectedCharacter() {
         return selectedCharacter;
     }
-
-    public void showMainMenu()        { cardLayout.show(root, SCREEN_MAIN); }
+    
+    public void showMainMenu()        { cardLayout.show(root, SCREEN_MAIN);      }
     public void showCharacterSelect() { cardLayout.show(root, SCREEN_CHARACTER); }
-    public void showSettings()        { cardLayout.show(root, SCREEN_SETTINGS); }
-    public void showGameScreen()      { cardLayout.show(root, SCREEN_GAME); }
+    public void showSettings()        { cardLayout.show(root, SCREEN_SETTINGS);  }
+    public void showGameScreen()      { cardLayout.show(root, SCREEN_GAME);      }
 
+    /**
+     * Called by CharacterSelectScreen after a character is chosen.
+     * Shows the loading screen first. startGame() will switch to SCREEN_GAME
+     * automatically once sprite loading finishes on the background thread.
+     */
     public void showGame() {
         cardLayout.show(root, SCREEN_LOADING);
         loadingScreen.startLoading(() -> {
@@ -73,6 +79,10 @@ public class GameWindow extends JFrame {
         });
     }
 
+    /**
+     * Switch to the battle screen and start a fight against the given enemy.
+     * When the battle ends, GameScreen.onBattleEnd() is called automatically.
+     */
     public void showBattle(Enemy mapEnemy, Character battleEnemy, GameScreen gs) {
         cardLayout.show(root, SCREEN_BATTLE);
         battleScreen.requestFocusInWindow();

@@ -4,7 +4,7 @@ public class Main {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             GameWindow window = new GameWindow();
-            window.showMainMenu(); // ← go straight to main menu on startup
+            window.showMainMenu();
         });
     }
-}//test
+}

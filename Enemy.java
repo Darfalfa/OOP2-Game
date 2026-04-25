@@ -25,6 +25,9 @@ public class Enemy {
 
     public boolean defeated = false;
 
+    public int respawnTimer = 0;
+    public int respawnDelay = 300; 
+
     // Sprite (optional — will draw a fallback shape if null)
     private BufferedImage sprite;
 
@@ -35,7 +38,6 @@ public class Enemy {
         pickNewDirection();
 
         try {
-            // Reuse the uploaded enemy image if you copy it into images/
             sprite = ImageIO.read(new File("images/enemy_shadow.png"));
         } catch (Exception e) {
             sprite = null; // fallback to drawn shape

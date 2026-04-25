@@ -13,8 +13,8 @@ public class CharacterSelectScreen extends JPanel {
     private BufferedImage ronnixSprite;
     private BufferedImage jakaraSprite;
 
-    private int cardWidth  = 180;
-    private int cardHeight = 280;
+    private int cardWidth  = 200;
+    private int cardHeight = 420;
 
     private Rectangle archerRect;
     private Rectangle ronnixRect;
@@ -37,7 +37,7 @@ public class CharacterSelectScreen extends JPanel {
 
     // Character stat bars (HP, MP, ATK, DEF) out of 10
     private static final String[] CHAR_NAMES = { "AYA", "RONNIX", "JAKARA" };
-    private static final String[] CHAR_CLASS = { "Archer", "Fighter", "Arcane Mage" };
+    private static final String[] CHAR_CLASS = { "Ranger", "Fighter", "Arcane Mage" };
     private static final int[][] CHAR_STATS  = {
         { 7, 8, 6, 5 },   // Aya
         { 9, 4, 9, 8 },   // Ronnix
@@ -48,15 +48,16 @@ public class CharacterSelectScreen extends JPanel {
         this.window = window;
         setBackground(Color.BLACK);
 
-        try { archerSprite = ImageIO.read(new File("images/standingForward.png")); }
+        // Aya — the Archer character
+        try { archerSprite = preparePortrait(ImageIO.read(new File("images/aya.png"))); }
         catch (Exception e) { archerSprite = null; }
 
-        // Try a dedicated Ronnix sprite; falls back to drawn silhouette if absent
-        try { ronnixSprite = ImageIO.read(new File("images/ronnixStanding.png")); }
+        // Ronnix — the Fighter character
+        try { ronnixSprite = preparePortrait(ImageIO.read(new File("images/ronnix.png"))); }
         catch (Exception e) { ronnixSprite = null; }
 
-        // Try a dedicated Jakara sprite; falls back to drawn silhouette if absent
-        try { jakaraSprite = ImageIO.read(new File("images/jakaraStanding.png")); }
+        // Jakara — the Arcane Mage character
+        try { jakaraSprite = preparePortrait(ImageIO.read(new File("images/jakara.png"))); }
         catch (Exception e) { jakaraSprite = null; }
 
         setupListeners();
@@ -193,34 +194,43 @@ public class CharacterSelectScreen extends JPanel {
         drawCorners(g2, x, y, w, h, hovered ? accent.brighter() : accent);
 
         // Sprite or silhouette
-        int spriteSize = 100;
-        int spriteX = x + (w - spriteSize) / 2;
-        int spriteY = y + 14;
+        // Portrait area: OUTPUT_W wide × OUTPUT_H tall, centred in card, top-padded by 10px
+        int portraitAreaW = OUTPUT_W;
+        int portraitAreaH = OUTPUT_H;
+        int spriteX = x + (w - portraitAreaW) / 2;
+        int spriteY = y + 10;
         if (sprite != null) {
-            // For Jakara, draw a subtle violet glow behind the sprite
+            // Subtle glow behind portrait
             if (isJakara) {
-                g2.setColor(new Color(160, 80, 255, 40));
-                g2.fillOval(spriteX - 8, spriteY - 4, spriteSize + 16, spriteSize + 16);
+                g2.setColor(new Color(160, 80, 255, 35));
+                g2.fillOval(spriteX - 8, spriteY + portraitAreaH / 2, portraitAreaW + 16, portraitAreaH / 2 + 8);
+            } else if (isRonnix) {
+                g2.setColor(new Color(60, 80, 180, 25));
+                g2.fillOval(spriteX - 8, spriteY + portraitAreaH / 2, portraitAreaW + 16, portraitAreaH / 2 + 8);
+            } else {
+                g2.setColor(new Color(180, 130, 40, 20));
+                g2.fillOval(spriteX - 8, spriteY + portraitAreaH / 2, portraitAreaW + 16, portraitAreaH / 2 + 8);
             }
-            g2.drawImage(sprite, spriteX, spriteY, spriteSize, spriteSize, null);
+            // Draw portrait directly — background already stripped, no clip needed
+            g2.drawImage(sprite, spriteX, spriteY, portraitAreaW, portraitAreaH, null);
         } else {
-            drawSilhouette(g2, spriteX, spriteY, spriteSize, isRonnix, isJakara, accent);
+            drawSilhouette(g2, spriteX, spriteY, Math.min(portraitAreaW, portraitAreaH), isRonnix, isJakara, accent);
         }
 
         // Name
         g2.setFont(new Font("Serif", Font.BOLD, 20));
         g2.setColor(Color.WHITE);
-        drawCenteredInRect(g2, CHAR_NAMES[idx], x, w, y + spriteSize + 26);
+        drawCenteredInRect(g2, CHAR_NAMES[idx], x, w, y + portraitAreaH + 26);
 
         // Class label
         g2.setFont(new Font("Serif", Font.ITALIC, 13));
         g2.setColor(accent);
-        drawCenteredInRect(g2, CHAR_CLASS[idx], x, w, y + spriteSize + 44);
+        drawCenteredInRect(g2, CHAR_CLASS[idx], x, w, y + portraitAreaH + 44);
 
         // Stat bars
         String[] statLabels = { "HP", "MP", "ATK", "DEF" };
         int[] stats = CHAR_STATS[idx];
-        int barAreaY = y + spriteSize + 58;
+        int barAreaY = y + portraitAreaH + 58;
         int barW = w - 30, barH = 9, barX = x + 15;
         for (int i = 0; i < 4; i++) {
             int by = barAreaY + i * 20;
@@ -349,6 +359,125 @@ public class CharacterSelectScreen extends JPanel {
     private void drawCenteredInRect(Graphics2D g2, String text, int rx, int rw, int y) {
         FontMetrics fm = g2.getFontMetrics();
         g2.drawString(text, rx + (rw - fm.stringWidth(text)) / 2, y);
+    }
+
+    // ── Portrait processing ───────────────────────────────────────────────────
+
+    /**
+     * Removes the white/light background via flood-fill, crops to the tight
+     * content bounding box, then places the character anchored to the BOTTOM
+     * of a fixed-size canvas. This ensures all three characters are drawn at
+     * the same visual height and stand on the same baseline inside their card.
+     *
+     * Canvas size: OUTPUT_W × OUTPUT_H (wider than tall so full body fits).
+     */
+    private static final int OUTPUT_W = 160;
+    private static final int OUTPUT_H = 200;
+
+    private BufferedImage preparePortrait(BufferedImage src) {
+        if (src == null) return null;
+
+        // 1. Convert to ARGB
+        BufferedImage argb = new BufferedImage(
+                src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D tmp = argb.createGraphics();
+        tmp.drawImage(src, 0, 0, null);
+        tmp.dispose();
+
+        // 2. Remove white / near-white / fringe background
+        removeWhiteBackground(argb);
+
+        // 3. Tight-crop to visible content
+        int[] bbox = contentBBox(argb);
+        if (bbox == null) return null;
+        int cx = bbox[0], cy = bbox[1], cw = bbox[2], ch = bbox[3];
+        BufferedImage cropped = argb.getSubimage(cx, cy, cw, ch);
+
+        // 4. Scale so the character fills OUTPUT_H in height (preserving aspect ratio)
+        //    then centre horizontally in OUTPUT_W.
+        double scale  = (double) OUTPUT_H / ch;
+        int scaledW   = (int)(cw * scale);
+        int scaledH   = OUTPUT_H;
+        // If too wide, fit by width instead
+        if (scaledW > OUTPUT_W) {
+            scale   = (double) OUTPUT_W / cw;
+            scaledW = OUTPUT_W;
+            scaledH = (int)(ch * scale);
+        }
+
+        // 5. Place on canvas, anchored to the BOTTOM-CENTRE so all characters
+        //    stand on the same line regardless of their different proportions.
+        BufferedImage result = new BufferedImage(OUTPUT_W, OUTPUT_H, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = result.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                            RenderingHints.VALUE_ANTIALIAS_ON);
+        int drawX = (OUTPUT_W - scaledW) / 2;
+        int drawY = OUTPUT_H - scaledH;          // bottom-anchored
+        g2.drawImage(cropped, drawX, drawY, scaledW, scaledH, null);
+        g2.dispose();
+        return result;
+    }
+
+    /** Removes white/near-white background in-place via edge flood-fill. */
+    private void removeWhiteBackground(BufferedImage img) {
+        int w = img.getWidth(), h = img.getHeight();
+        boolean[][] visited = new boolean[w][h];
+        java.util.Queue<int[]> queue = new java.util.LinkedList<>();
+
+        for (int x = 0; x < w; x++) {
+            enqueuePortrait(img, x, 0,     visited, queue);
+            enqueuePortrait(img, x, h - 1, visited, queue);
+        }
+        for (int y = 1; y < h - 1; y++) {
+            enqueuePortrait(img, 0,     y, visited, queue);
+            enqueuePortrait(img, w - 1, y, visited, queue);
+        }
+
+        while (!queue.isEmpty()) {
+            int[] px = queue.poll();
+            int cx = px[0], cy = px[1];
+            img.setRGB(cx, cy, 0x00000000);
+            int[][] nb = { {cx-1,cy},{cx+1,cy},{cx,cy-1},{cx,cy+1} };
+            for (int[] n : nb) enqueuePortrait(img, n[0], n[1], visited, queue);
+        }
+    }
+
+    private void enqueuePortrait(BufferedImage img, int x, int y,
+                                  boolean[][] visited, java.util.Queue<int[]> queue) {
+        int w = img.getWidth(), h = img.getHeight();
+        if (x < 0 || y < 0 || x >= w || y >= h || visited[x][y]) return;
+        visited[x][y] = true;
+        int argb = img.getRGB(x, y);
+        int a = (argb >> 24) & 0xFF;
+        int r = (argb >> 16) & 0xFF;
+        int g = (argb >>  8) & 0xFF;
+        int b =  argb        & 0xFF;
+        // Transparent, pure white, near-white, and light grey all count as background
+        boolean isBackground = (a < 20) || (r >= 190 && g >= 190 && b >= 190);
+        if (isBackground) queue.add(new int[]{x, y});
+    }
+
+    /**
+     * Returns [x, y, width, height] of the tight bounding box of non-transparent
+     * pixels, or null if the image is completely transparent.
+     */
+    private int[] contentBBox(BufferedImage img) {
+        int w = img.getWidth(), h = img.getHeight();
+        int minX = w, minY = h, maxX = -1, maxY = -1;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if (((img.getRGB(x, y) >> 24) & 0xFF) > 20) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+        if (maxX < minX || maxY < minY) return null;
+        return new int[]{minX, minY, maxX - minX + 1, maxY - minY + 1};
     }
 
     private Color lerp(Color a, Color b, float t) {
