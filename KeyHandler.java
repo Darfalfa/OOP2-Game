@@ -29,9 +29,17 @@ public class KeyHandler implements KeyListener {
 
         gameScreen.handleShopInput(e.getKeyCode());
 
+        //if (e.getKeyCode() == KeyEvent.VK_E) {
+        //    gameScreen.openShopDialogue();
+        //}
+
         if (e.getKeyCode() == KeyEvent.VK_E) {
-            gameScreen.openShopDialogue();
-        }
+    gameScreen.openShopDialogue();
+}
+
+if (e.getKeyCode() == KeyEvent.VK_T) {
+    gameScreen.openWensDialogue();
+}
 
         gameScreen.handleInfoInput(code);
     }

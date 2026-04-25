@@ -63,6 +63,7 @@ public class GameScreen extends JPanel implements Runnable {
 
     // SHOP IMAGES
     private Image shopBG;
+    private Image makoChatboxImg;
     private Image healthImg;
     private Image expImg;
     private Image coinImg;
@@ -82,12 +83,32 @@ public class GameScreen extends JPanel implements Runnable {
     private boolean shopOpen = false;
     private boolean makoBlink = false;
     private int blinkTimer = 0;
+    private boolean wensDialogueOpen = false;
+    private boolean wensDialogueSeen = false;
+    private Image wensDialogueImg;
+    
+    // Feedback message shown at the top of the shop (not blocking buttons)
+    private String shopFeedback = "";
+    private int shopFeedbackTimer = 0;
+    private static final int FEEDBACK_DURATION = 120; // 2 seconds at 60 FPS
 
     private int selectedOption = 0; // 0 = Shop, 1 = Close
+
+    // Dialogue mouse hit-rects and hover state
+    private Rectangle dialogueShopBtn  = null;
+    private Rectangle dialogueCloseBtn = null;
+    private int dialogueHovered = -1; // -1=none, 0=Shop, 1=Close
 
     // Prices
     private final int HEALTH_PRICE = 5;
     private final int EXP_PRICE = 5;
+
+    private String shopMessage = "";
+    private int shopMessageTimer = 0;
+    private static final int MESSAGE_DURATION = 120;
+    private boolean shopMessageIsError = true;
+
+    
 
     public GameScreen(GameWindow window) {
         this.window = window;
@@ -103,6 +124,7 @@ public class GameScreen extends JPanel implements Runnable {
 
         try {
             shopBG = new ImageIcon("images/Shop_UI.png").getImage();
+            makoChatboxImg = new ImageIcon("images/Mako_Dialogue_Box.png").getImage();
             healthImg = new ImageIcon("images/Health_potion.png").getImage();
             expImg = new ImageIcon("images/EXP_potion.png").getImage();
             coinImg = new ImageIcon("images/Coin.png").getImage();
@@ -112,6 +134,7 @@ public class GameScreen extends JPanel implements Runnable {
             buyBtnHoverImg = new ImageIcon("images/Shop_Button_Clicked_Buy_Placeholder.png").getImage();
             exitBtnImg = new ImageIcon("images/shop_button_exit_placeholder.png").getImage();
             itemCardImg = new ImageIcon("images/Shop_Item_Placeholder.png").getImage();
+            wensDialogueImg = new ImageIcon("images/Wens_dialogue.png").getImage();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -119,98 +142,141 @@ public class GameScreen extends JPanel implements Runnable {
         addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
+                Point p = e.getPoint();
+
+                // ── Dialogue hover ────────────────────────────────────────────
+                if (shopDialogueOpen) {
+                    int prevDH = dialogueHovered;
+                    dialogueHovered = -1;
+                    if (dialogueShopBtn  != null && dialogueShopBtn.contains(p))  dialogueHovered = 0;
+                    else if (dialogueCloseBtn != null && dialogueCloseBtn.contains(p)) dialogueHovered = 1;
+                    if (prevDH != dialogueHovered) repaint();
+                    setCursor(dialogueHovered >= 0
+                        ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                        : Cursor.getDefaultCursor());
+                    return;
+                }
+
+                // ── Menu button hover ─────────────────────────────────────────
                 boolean prev = menuBtnHovered;
-                menuBtnHovered = menuBtnRect != null && menuBtnRect.contains(e.getPoint());
+                menuBtnHovered = menuBtnRect != null && menuBtnRect.contains(p);
                 if (prev != menuBtnHovered) repaint();
+
+                // ── Shop button hover ─────────────────────────────────────────
+                if (shopOpen) {
+                    Rectangle prevHov = hoveredBtn;
+                    hoveredBtn = null;
+                    if      (buyHealthBtn  != null && buyHealthBtn.contains(p))  hoveredBtn = buyHealthBtn;
+                    else if (sellHealthBtn != null && sellHealthBtn.contains(p)) hoveredBtn = sellHealthBtn;
+                    else if (buyExpBtn     != null && buyExpBtn.contains(p))     hoveredBtn = buyExpBtn;
+                    else if (sellExpBtn    != null && sellExpBtn.contains(p))    hoveredBtn = sellExpBtn;
+                    else if (exitBtn       != null && exitBtn.contains(p))       hoveredBtn = exitBtn;
+                    if (prevHov != hoveredBtn) repaint();
+                    setCursor(hoveredBtn != null
+                        ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                        : Cursor.getDefaultCursor());
+                    return;
+                }
+
                 setCursor(menuBtnHovered
                     ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     : Cursor.getDefaultCursor());
-
-                if (shopOpen) {
-                    Point p = e.getPoint();
-                    hoveredBtn = null;
-
-                    if (buyHealthBtn != null && buyHealthBtn.contains(p)) hoveredBtn = buyHealthBtn;
-                    else if (sellHealthBtn != null && sellHealthBtn.contains(p)) hoveredBtn = sellHealthBtn;
-                    else if (buyExpBtn != null && buyExpBtn.contains(p)) hoveredBtn = buyExpBtn;
-                    else if (sellExpBtn != null && sellExpBtn.contains(p)) hoveredBtn = sellExpBtn;
-                    else if (exitBtn != null && exitBtn.contains(p)) hoveredBtn = exitBtn;
-
-                    repaint();
-                }
             }
         });
 
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if (menuBtnRect != null && menuBtnRect.contains(e.getPoint())) {
-                    stopGame();
-                    window.showMainMenu();
+            Point p = e.getPoint();
+    if (wensDialogueOpen) {
+        wensDialogueOpen = false;
+        return;
+    }
+
+    if (menuBtnRect != null && menuBtnRect.contains(e.getPoint())) {
+        stopGame();
+        window.showMainMenu();
+    }
+
+                // ── Dialogue clicks ───────────────────────────────────────────
+                if (shopDialogueOpen) {
+                    if (dialogueShopBtn != null && dialogueShopBtn.contains(p)) {
+                        shopDialogueOpen = false;
+                        shopOpen = true;
+                        dialogueHovered = -1;
+                        repaint();
+                        return;
+                    }
+                    if (dialogueCloseBtn != null && dialogueCloseBtn.contains(p)) {
+                        shopDialogueOpen = false;
+                        dialogueHovered = -1;
+                        repaint();
+                        return;
+                    }
                 }
 
                 if (shopOpen) {
 
-                    Point p = e.getPoint();
+// BUY HEALTH
+if (buyHealthBtn != null && buyHealthBtn.contains(p)) {
+    if (playerCharacter.getGold() >= HEALTH_PRICE) {
+        playerCharacter.addGold(-HEALTH_PRICE);
+        playerCharacter.setHealthPotion(playerCharacter.getHealthPotion() + 1);
+        showShopFeedback("Health Potion purchased!");
+    } else {
+        showShopFeedback("Not enough coins!");
+    }
+}
 
-                    // BUY HEALTH
-                    if (buyHealthBtn != null && buyHealthBtn.contains(p)) {
-                        if (playerCharacter.getGold() >= HEALTH_PRICE) {
-                            playerCharacter.addGold(-HEALTH_PRICE);
-                            playerCharacter.setHealthPotion(
-                                    playerCharacter.getHealthPotion() + 1
-                            );
-                        }
-                    }
+// SELL HEALTH
+if (sellHealthBtn != null && sellHealthBtn.contains(p)) {
+    if (playerCharacter.getHealthPotion() > 0) {
+        playerCharacter.setHealthPotion(playerCharacter.getHealthPotion() - 1);
+        playerCharacter.addGold(HEALTH_PRICE);
+        showShopFeedback("Health Potion sold!");
+    } else {
+        showShopFeedback("No potions to sell!");
+    }
+}
 
-                    // SELL HEALTH
-                    if (sellHealthBtn != null && sellHealthBtn.contains(p)) {
-                        if (playerCharacter.getHealthPotion() > 0) {
-                            playerCharacter.setHealthPotion(
-                                    playerCharacter.getHealthPotion() - 1
-                            );
-                            playerCharacter.addGold(HEALTH_PRICE);
-                        }
-                    }
+// BUY EXP
+if (buyExpBtn != null && buyExpBtn.contains(p)) {
+    if (playerCharacter.getGold() >= EXP_PRICE) {
+        playerCharacter.addGold(-EXP_PRICE);
+        playerCharacter.setExpPotion(playerCharacter.getExpPotion() + 1);
+        showShopFeedback("EXP Potion purchased!");
+    } else {
+        showShopFeedback("Not enough coins!");
+    }
+}
 
-                    // BUY EXP
-                    if (buyExpBtn != null && buyExpBtn.contains(p)) {
-                        if (playerCharacter.getGold() >= EXP_PRICE) {
-                            playerCharacter.addGold(-EXP_PRICE);
-                            playerCharacter.setExpPotion(
-                                    playerCharacter.getExpPotion() + 1
-                            );
-                        }
-                    }
-
-                    // SELL EXP
-                    if (sellExpBtn != null && sellExpBtn.contains(p)) {
-                        if (playerCharacter.getExpPotion() > 0) {
-                            playerCharacter.setExpPotion(
-                                    playerCharacter.getExpPotion() - 1
-                            );
-                            playerCharacter.addGold(EXP_PRICE);
-                        }
-                    }
+// SELL EXP
+if (sellExpBtn != null && sellExpBtn.contains(p)) {
+    if (playerCharacter.getExpPotion() > 0) {
+        playerCharacter.setExpPotion(playerCharacter.getExpPotion() - 1);
+        playerCharacter.addGold(EXP_PRICE);
+        showShopFeedback("EXP Potion sold!");
+    } else {
+        showShopFeedback("No potions to sell!");
+    }
+}
 
                     // EXIT
                     if (exitBtn != null && exitBtn.contains(p)) {
                         shopOpen = false;
+                        hoveredBtn = null;
                     }
                     repaint();
                 }
 
-                // ===== EXP POTION BUTTON (always clickable) =====
-                if (expPotionBtn != null && expPotionBtn.contains(e.getPoint())) {
+                // ── EXP Potion HUD button ─────────────────────────────────────
+                if (expPotionBtn != null && expPotionBtn.contains(p)) {
                     if (playerCharacter.getExpPotion() > 0) {
-
                         String result = playerCharacter.useExpPotion();
                         System.out.println(result);
-
                     } else {
                         System.out.println("No EXP potions!");
                     }
-
                     repaint();
                 }
             }
@@ -306,13 +372,18 @@ public class GameScreen extends JPanel implements Runnable {
         postBattleCooldown = 120; // about 2 seconds
 
         if (won) {
-            defeated.defeated = true;
-            defeated.respawnTimer = 300; // ~5 seconds
-        } else {
-            // Push player away a bit after losing so battle doesn't instantly retrigger
-            player.x = Math.max(0, player.x - 100);
-            player.y = Math.max(0, player.y - 100);
-        }
+    defeated.defeated = true;
+    defeated.respawnTimer = 300; // ~5 seconds
+
+    if (!wensDialogueSeen && playerCharacter != null && playerCharacter.getLevel() >= 4) {
+        wensDialogueOpen = true;
+        wensDialogueSeen = true;
+    }
+} else {
+    // Push player away a bit after losing so battle doesn't instantly retrigger
+    player.x = Math.max(0, player.x - 100);
+    player.y = Math.max(0, player.y - 100);
+}
 
         SwingUtilities.invokeLater(() -> {
             window.showGameScreen();
@@ -401,6 +472,7 @@ public class GameScreen extends JPanel implements Runnable {
             makoBlink = !makoBlink;
             blinkTimer = 0;
         }
+        if (shopFeedbackTimer > 0) shopFeedbackTimer--;
     }
 
     private void triggerBattle(Enemy enemy) {
@@ -412,72 +484,88 @@ public class GameScreen extends JPanel implements Runnable {
         SwingUtilities.invokeLater(() -> window.showBattle(enemy, battleEnemy, this));
     }
 
+    private void showShopFeedback(String msg) {
+    shopFeedback = msg;
+    shopFeedbackTimer = FEEDBACK_DURATION;
+}
+
+    //public void openShopDialogue() {
+    //    if (!shopOpen && !shopDialogueOpen) {
+    //        shopDialogueOpen = true;
+    //        selectedOption = 0;
+    //        repaint();
+    //    }
+    //}
+
     public void openShopDialogue() {
-        if (!shopOpen && !shopDialogueOpen) {
-            shopDialogueOpen = true;
-            selectedOption = 0;
-            repaint();
-        }
+    if (!shopOpen && !shopDialogueOpen) {
+        shopDialogueOpen = true;
+        selectedOption = 0;
+        repaint();
     }
+}
+
+public void openWensDialogue() {
+    wensDialogueOpen = true;
+    repaint();
+}
 
     public void handleShopInput(int keyCode) {
         if (playerCharacter == null) return;
-        // ===== DIALOGUE =====
+        // ===== DIALOGUE — only Escape closes it (mouse handles Shop/Close) =====
         if (shopDialogueOpen) {
-            if (keyCode == KeyEvent.VK_UP || keyCode == KeyEvent.VK_DOWN) {
-                selectedOption = 1 - selectedOption;
-            }
-            if (keyCode == KeyEvent.VK_ENTER) {
-                if (selectedOption == 0) {
-                    shopDialogueOpen = false;
-                    shopOpen = true;
-                } else {
-                    shopDialogueOpen = false;
-                }
+            if (keyCode == KeyEvent.VK_ESCAPE) {
+                shopDialogueOpen = false;
+                repaint();
             }
         }
         // ===== SHOP =====
         else if (shopOpen) {
             // BUY HEALTH
-            if (keyCode == KeyEvent.VK_1) {
-                if (playerCharacter.getGold() >= HEALTH_PRICE) {
-                    playerCharacter.addGold(-HEALTH_PRICE);
-                    playerCharacter.setHealthPotion(
-                            playerCharacter.getHealthPotion() + 1
-                    );
-                }
-            }
-            // BUY EXP
-            if (keyCode == KeyEvent.VK_2) {
-                if (playerCharacter.getGold() >= EXP_PRICE) {
-                    playerCharacter.addGold(-EXP_PRICE);
-                    playerCharacter.setExpPotion(
-                            playerCharacter.getExpPotion() + 1
-                    );
-                }
-            }
-            // SELL HEALTH
-            if (keyCode == KeyEvent.VK_Q) {
-                if (playerCharacter.getHealthPotion() > 0) {
-                    playerCharacter.setHealthPotion(
-                            playerCharacter.getHealthPotion() - 1
-                    );
-                    playerCharacter.addGold(HEALTH_PRICE);
-                }
-            }
-            // SELL EXP
-            if (keyCode == KeyEvent.VK_W) {
-                if (playerCharacter.getExpPotion() > 0) {
-                    playerCharacter.setExpPotion(
-                            playerCharacter.getExpPotion() - 1
-                    );
-                    playerCharacter.addGold(EXP_PRICE);
-                }
-            }
-            // EXIT SHOP
-            if (keyCode == KeyEvent.VK_ESCAPE) {
-                shopOpen = false;
-            }
+// BUY HEALTH
+if (keyCode == KeyEvent.VK_1) {
+    if (playerCharacter.getGold() >= HEALTH_PRICE) {
+        playerCharacter.addGold(-HEALTH_PRICE);
+        playerCharacter.setHealthPotion(playerCharacter.getHealthPotion() + 1);
+        showShopFeedback("Health Potion purchased!");
+    } else {
+        showShopFeedback("Not enough coins!");
+    }
+}
+// BUY EXP
+if (keyCode == KeyEvent.VK_2) {
+    if (playerCharacter.getGold() >= EXP_PRICE) {
+        playerCharacter.addGold(-EXP_PRICE);
+        playerCharacter.setExpPotion(playerCharacter.getExpPotion() + 1);
+        showShopFeedback("EXP Potion purchased!");
+    } else {
+        showShopFeedback("Not enough coins!");
+    }
+}
+// SELL HEALTH
+if (keyCode == KeyEvent.VK_Q) {
+    if (playerCharacter.getHealthPotion() > 0) {
+        playerCharacter.setHealthPotion(playerCharacter.getHealthPotion() - 1);
+        playerCharacter.addGold(HEALTH_PRICE);
+        showShopFeedback("Health Potion sold!");
+    } else {
+        showShopFeedback("No potions to sell!");
+    }
+}
+// SELL EXP
+if (keyCode == KeyEvent.VK_W) {
+    if (playerCharacter.getExpPotion() > 0) {
+        playerCharacter.setExpPotion(playerCharacter.getExpPotion() - 1);
+        playerCharacter.addGold(EXP_PRICE);
+        showShopFeedback("EXP Potion sold!");
+    } else {
+        showShopFeedback("No potions to sell!");
+    }
+}
+// EXIT SHOP
+if (keyCode == KeyEvent.VK_ESCAPE) {
+    shopOpen = false;
+}
         }
         repaint();
     }
@@ -505,15 +593,18 @@ public class GameScreen extends JPanel implements Runnable {
 
         drawHUD(g2);
 
-        // DRAW SHOP DIALOGUE
         if (shopDialogueOpen) {
-            drawShopDialogue(g2);
-        }
+    drawShopDialogue(g2);
+}
 
-        // DRAW SHOP
-        if (shopOpen) {
-            drawShop(g2);
-        }
+if (wensDialogueOpen) {
+    drawWensDialogue(g2);
+}
+
+// DRAW SHOP
+if (shopOpen) {
+    drawShop(g2);
+}
 
         if (infoOpen) {
             drawInfoWindow(g2);
@@ -523,34 +614,203 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     private void drawShopDialogue(Graphics2D g2) {
-        int w = 600;
-        int h = 200;
+        int screenW = getWidth();
+        int screenH = getHeight();
 
-        int x = (getWidth() - w) / 2;
-        int y = getHeight() - h - 40;
+        // ── Render the chatbox image at a fixed comfortable size ──────────────
+        // Natural image ratio: 1108 × 468.
+        // We render at 760px wide so it fits on 1280px screens without crowding.
+        int imgW = 760;
+        int imgH = (int)(imgW * 468.0 / 1108.0); // ≈ 321px
 
-        g2.setColor(new Color(20, 20, 40, 230));
-        g2.fillRoundRect(x, y, w, h, 20, 20);
+        // Centre horizontally, anchor near the bottom of the screen
+        int imgX = (screenW - imgW) / 2;
+        int imgY = screenH - imgH - 40;
 
-        g2.setColor(Color.WHITE);
-        g2.drawRoundRect(x, y, w, h, 20, 20);
+        // Draw the chatbox image
+        if (makoChatboxImg != null) {
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g2.drawImage(makoChatboxImg, imgX, imgY, imgW, imgH, null);
+        } else {
+            // Fallback plain box
+            g2.setColor(new Color(20, 16, 42, 235));
+            g2.fillRoundRect(imgX, imgY, imgW, imgH, 14, 14);
+            g2.setColor(new Color(90, 100, 150));
+            g2.setStroke(new BasicStroke(2f));
+            g2.drawRoundRect(imgX, imgY, imgW, imgH, 14, 14);
+        }
 
-        g2.setFont(new Font("Arial", Font.PLAIN, 16));
+        // ── Text area coordinates (derived from pixel analysis of image) ──────
+        // Portrait occupies left 30.69% of image width  → x=0..340 of 1108
+        // Text box starts at x≈340, top y≈148, bottom y≈460 (of 468)
+        // In rendered space:
+        int portraitEndX = imgX + (int)(imgW * 340.0 / 1108.0); // ~233px from imgX
+        int boxTopY      = imgY + (int)(imgH * 148.0 / 468.0);  // ~101px from imgY
+        int boxBotY      = imgY + (int)(imgH * 460.0 / 468.0);  // ~315px from imgY
+        int boxH         = boxBotY - boxTopY;                    // ~214px
 
-        g2.drawString("*Yawn* Yeah ... welcome to the tavern.", x + 20, y + 40);
-        g2.drawString("If you're here for potions,", x + 20, y + 70);
-        g2.drawString("they're on the table. *yawn*", x + 20, y + 100);
+        int textX    = portraitEndX + 18;
+        int textMaxW = imgX + imgW - textX - 16;
 
-        g2.setFont(new Font("Arial", Font.BOLD, 18));
+        // ── Dialogue text ─────────────────────────────────────────────────────
+        // Sits in the top ~55% of the box, below the name-tag area (~20% of boxH)
+        int textStartY = boxTopY + (int)(boxH * 0.20);
+        int lineGap    = (int)(boxH * 0.14);
 
-        g2.setColor(selectedOption == 0 ? Color.YELLOW : Color.WHITE);
-        g2.drawString("Shop", x + 120, y + 150);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setFont(new Font("Serif", Font.PLAIN, 15));
+        g2.setColor(new Color(215, 210, 235));
+        g2.drawString("*Yawn* Yeah ... welcome to the tavern.", textX, textStartY);
+        g2.drawString("If you're here for potions,",            textX, textStartY + lineGap);
+        g2.drawString("they're on the table. *yawn*",           textX, textStartY + lineGap * 2);
 
-        g2.setColor(selectedOption == 1 ? Color.YELLOW : Color.WHITE);
-        g2.drawString("Close", x + 240, y + 150);
+        // ── Option buttons — bottom 28% of the box ───────────────────────────
+        int btnW = 130;
+        int btnH = (int)(boxH * 0.24);
+        int btnY = boxBotY - btnH - (int)(boxH * 0.06);
+
+        // Spread buttons inside the text area
+        int textAreaW  = imgX + imgW - textX - 16;
+        int shopBtnX   = textX + (int)(textAreaW * 0.04);
+        int closeBtnX  = textX + (int)(textAreaW * 0.36);
+
+        // Register hit-rects for mouse clicks
+        dialogueShopBtn  = new Rectangle(shopBtnX,  btnY, btnW, btnH);
+        dialogueCloseBtn = new Rectangle(closeBtnX, btnY, btnW, btnH);
+
+        drawDialogueButton(g2, "Shop",  shopBtnX,  btnY, btnW, btnH, dialogueHovered == 0,
+                           new Color(210, 170, 60));
+        drawDialogueButton(g2, "Close", closeBtnX, btnY, btnW, btnH, dialogueHovered == 1,
+                           new Color(200, 195, 220));
     }
 
-    private void drawShop(Graphics2D g2) {
+    private void drawDialogueButton(Graphics2D g2, String label,
+                                     int x, int y, int w, int h,
+                                     boolean hovered, Color accent) {
+        // Only show design when actually hovered — no default highlight
+        if (hovered) {
+            // Outer glow
+            g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 60));
+            g2.fillRoundRect(x - 6, y - 6, w + 12, h + 12, 12, 12);
+
+            // Button background
+            g2.setColor(new Color(50, 38, 12, 210));
+            g2.fillRoundRect(x, y, w, h, 8, 8);
+
+            // Border
+            g2.setColor(accent);
+            g2.setStroke(new BasicStroke(2f));
+            g2.drawRoundRect(x, y, w, h, 8, 8);
+
+            // Arrow indicator
+            int ax = x + 10, ay = y + h / 2;
+            int[] xp = {ax, ax + 7, ax};
+            int[] yp = {ay - 5, ay, ay + 5};
+            g2.setColor(accent);
+            g2.fillPolygon(xp, yp, 3);
+        } else {
+            // Not hovered — just transparent dark backing so text is readable
+            g2.setColor(new Color(15, 12, 30, 140));
+            g2.fillRoundRect(x, y, w, h, 8, 8);
+        }
+
+        // Label
+        g2.setFont(new Font("Serif", Font.BOLD, 15));
+        FontMetrics fm = g2.getFontMetrics();
+        int tx = x + (w - fm.stringWidth(label)) / 2;
+        int ty = y + (h + fm.getAscent() - fm.getDescent()) / 2;
+
+        // Shadow
+        g2.setColor(new Color(0, 0, 0, 160));
+        g2.drawString(label, tx + 1, ty + 1);
+        // Main text — gold when hovered, soft white otherwise
+        g2.setColor(hovered ? accent : new Color(200, 195, 220));
+        g2.drawString(label, tx, ty);
+    }
+
+    /*private void drawWensDialogue(Graphics2D g2) {
+    int screenW = getWidth();
+    int screenH = getHeight();
+
+    int boxW = (int)(screenW * 0.80);
+    int boxH = (int)(screenH * 0.38);
+    int boxX = (screenW - boxW) / 2;
+    int boxY = screenH - boxH - 30;
+
+    if (wensDialogueImg != null) {
+        g2.drawImage(wensDialogueImg, boxX, boxY, boxW, boxH, null);
+    }
+
+    int textX = boxX + (int)(boxW * 0.33);
+    int textY = boxY + (int)(boxH * 0.30);
+    int textMaxW = (int)(boxW * 0.63);
+
+    String line = "Traveler, you've proven your strength. From here on, you won't walk alone. "
+                + "I am your companion now\u2014ready to face whatever trials await us.";
+
+    g2.setFont(new Font("Arial", Font.PLAIN, 16));
+    g2.setColor(new Color(220, 210, 190));
+    drawWensWrappedText(g2, line, textX, textY, textMaxW);
+
+    g2.setFont(new Font("Arial", Font.ITALIC, 12));
+    g2.setColor(new Color(180, 180, 180, 200));
+    g2.drawString("Click to continue", boxX + boxW - 130, boxY + boxH - 14);
+}
+*/
+
+private void drawWensDialogue(Graphics2D g2) {
+    int screenW = getWidth();
+    int screenH = getHeight();
+
+    // Keep the original image aspect ratio (1540 x 660 from your image)
+    int boxW = (int)(screenW * 0.90);
+    int boxH = (int)(boxW * (660.0 / 1540.0));
+    int boxX = (screenW - boxW) / 2;
+    int boxY = screenH - boxH - 30;
+
+    if (wensDialogueImg != null) {
+        g2.drawImage(wensDialogueImg, boxX, boxY, boxW, boxH, null);
+    }
+
+    // Text starts after the portrait which takes up ~38% of the image width
+    int textX = boxX + (int)(boxW * 0.40);
+    int textY = boxY + (int)(boxH * 0.35);
+    int textMaxW = (int)(boxW * 0.57);
+
+    String line = "Traveler, you've proven your strength. From here on, you won't walk alone. "
+                + "I am your companion now\u2014ready to face whatever trials await us.";
+
+    g2.setFont(new Font("Arial", Font.PLAIN, 16));
+    g2.setColor(new Color(220, 210, 190));
+    drawWensWrappedText(g2, line, textX, textY, textMaxW);
+
+    g2.setFont(new Font("Arial", Font.ITALIC, 12));
+    g2.setColor(new Color(180, 180, 180, 200));
+    g2.drawString("Click to continue", boxX + boxW - 140, boxY + boxH - 14);
+}
+
+private void drawWensWrappedText(Graphics2D g2, String text, int x, int y, int maxWidth) {
+    FontMetrics fm = g2.getFontMetrics();
+    int lineHeight = fm.getHeight() + 2;
+    String[] words = text.split(" ");
+    String line = "";
+
+    for (String word : words) {
+        String test = line + word + " ";
+        if (fm.stringWidth(test) > maxWidth && !line.isEmpty()) {
+            g2.drawString(line.trim(), x, y);
+            line = word + " ";
+            y += lineHeight;
+        } else {
+            line = test;
+        }
+    }
+    if (!line.isEmpty()) g2.drawString(line.trim(), x, y);
+}
+
+private void drawShop(Graphics2D g2) {
 
         if (playerCharacter == null) return;
 
@@ -569,6 +829,28 @@ public class GameScreen extends JPanel implements Runnable {
         g2.setFont(new Font("Arial", Font.BOLD, 20));
         g2.drawImage(coinImg, 20, 20, 30, 30, null);
         g2.drawString(String.valueOf(playerCharacter.getGold()), 60, 45);
+        // ===== FEEDBACK MESSAGE (top-centre, never overlaps buttons) =====
+if (shopFeedbackTimer > 0 && !shopFeedback.isEmpty()) {
+    float alpha = Math.min(1f, shopFeedbackTimer / 30f);
+    boolean isError = shopFeedback.contains("Not enough") || shopFeedback.contains("No potion");
+    Color bgColor  = isError ? new Color(180, 30, 30, (int)(200 * alpha))
+                             : new Color(30, 130, 60,  (int)(200 * alpha));
+    Color txtColor = new Color(255, 255, 255, (int)(255 * alpha));
+
+    g2.setFont(new Font("Arial", Font.BOLD, 16));
+    FontMetrics fm2 = g2.getFontMetrics();
+    int msgW = fm2.stringWidth(shopFeedback) + 32;
+    int msgH = 34;
+    int msgX = (screenW - msgW) / 2;
+    int msgY = 14;
+
+    g2.setColor(bgColor);
+    g2.fillRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
+    g2.setColor(txtColor);
+    g2.drawString(shopFeedback,
+            msgX + 16,
+            msgY + (msgH + fm2.getAscent() - fm2.getDescent()) / 2);
+}
 
         // ===== ITEM CARDS =====
         int cardY = 120;
@@ -589,14 +871,69 @@ public class GameScreen extends JPanel implements Runnable {
 
         drawItemCard(g2, leftX, cardY, true);
         drawItemCard(g2, rightX, cardY, false);
+        // ===== FEEDBACK MESSAGE =====
+if (shopMessageTimer > 0 && !shopMessage.isEmpty()) {
+    float alpha = Math.min(1f, shopMessageTimer / 30f);
+    int a = (int)(alpha * 255);
 
+    g2.setFont(new Font("Arial", Font.BOLD, 16));
+    FontMetrics fmMsg = g2.getFontMetrics();
+    int msgW = fmMsg.stringWidth(shopMessage) + 32;
+    int msgH = 38;
+    int msgX = (screenW - msgW) / 2;
+    int msgY = screenH - 160;
+
+    Color bgCol = shopMessageIsError
+        ? new Color(120, 20, 20, Math.min(a, 210))
+        : new Color(20, 90, 20, Math.min(a, 210));
+    g2.setColor(bgCol);
+    g2.fillRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
+
+    Color borderCol = shopMessageIsError
+        ? new Color(220, 80, 80, a)
+        : new Color(80, 200, 80, a);
+    g2.setColor(borderCol);
+    g2.setStroke(new BasicStroke(1.5f));
+    g2.drawRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
+    g2.setStroke(new BasicStroke(1f));
+
+    g2.setColor(new Color(0, 0, 0, Math.min(a, 160)));
+    g2.drawString(shopMessage, msgX + 17, msgY + (msgH + fmMsg.getAscent() - fmMsg.getDescent()) / 2 + 1);
+    g2.setColor(new Color(255, 255, 255, a));
+    g2.drawString(shopMessage, msgX + 16, msgY + (msgH + fmMsg.getAscent() - fmMsg.getDescent()) / 2);
+}
         // ===== EXIT BUTTON =====
-        exitBtn = new Rectangle(160, screenH - 100, 150, 60);
-        g2.drawImage(exitBtnImg, exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, null);
+exitBtn = new Rectangle(160, screenH - 100, 150, 60);
+boolean exitHov = hoveredBtn != null && hoveredBtn.equals(exitBtn);
 
-        g2.setFont(new Font("Arial", Font.BOLD, 16));
-        g2.setColor(Color.WHITE);
-        g2.drawString("EXIT", exitBtn.x + 50, exitBtn.y + 35);
+// Outer glow on hover
+if (exitHov) {
+    g2.setColor(new Color(160, 80, 220, 75));
+    g2.fillRoundRect(exitBtn.x - 6, exitBtn.y - 6,
+                     exitBtn.width + 12, exitBtn.height + 12, 12, 12);
+}
+
+g2.drawImage(exitBtnImg, exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, null);
+
+// Bright overlay + border on hover
+if (exitHov) {
+    g2.setColor(new Color(255, 255, 255, 40));
+    g2.fillRoundRect(exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, 6, 6);
+    g2.setColor(new Color(210, 160, 255, 220));
+    g2.setStroke(new BasicStroke(2f));
+    g2.drawRoundRect(exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, 6, 6);
+    g2.setStroke(new BasicStroke(1f));
+}
+
+// Text with drop shadow
+g2.setFont(new Font("Arial", Font.BOLD, 16));
+FontMetrics fmExit = g2.getFontMetrics();
+int etx = exitBtn.x + (exitBtn.width - fmExit.stringWidth("EXIT")) / 2;
+int ety = exitBtn.y + (exitBtn.height + fmExit.getAscent()) / 2 - 4;
+g2.setColor(new Color(0, 0, 0, 160));
+g2.drawString("EXIT", etx + 1, ety + 1);
+g2.setColor(exitHov ? new Color(255, 238, 180) : Color.WHITE);
+g2.drawString("EXIT", etx, ety);
     }
 
     private void drawItemCard(Graphics2D g2, int x, int y, boolean isHealth) {
@@ -821,21 +1158,46 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     private void drawButton(Graphics2D g2, Rectangle rect, String text) {
+    // Use .equals() — rect is a new object every frame so == always fails
+    boolean hovered = hoveredBtn != null && hoveredBtn.equals(rect);
 
-        Image img = (rect == hoveredBtn) ? buyBtnHoverImg : buyBtnImg;
-
-        g2.drawImage(img, rect.x, rect.y, rect.width, rect.height, null);
-
-        g2.setColor(Color.WHITE);
-        g2.setFont(new Font("Arial", Font.BOLD, 14));
-
-        FontMetrics fm = g2.getFontMetrics();
-        int tx = rect.x + (rect.width - fm.stringWidth(text)) / 2;
-        int ty = rect.y + (rect.height + fm.getAscent()) / 2 - 4;
-
-        g2.drawString(text, tx, ty);
+    // Outer glow on hover
+    if (hovered) {
+        g2.setColor(new Color(160, 80, 220, 75));
+        g2.fillRoundRect(rect.x - 6, rect.y - 6,
+                         rect.width + 12, rect.height + 12, 12, 12);
     }
 
+    // Base image (hover variant if available)
+    Image img = hovered ? buyBtnHoverImg : buyBtnImg;
+    g2.drawImage(img, rect.x, rect.y, rect.width, rect.height, null);
+
+    // Bright overlay + border on hover
+    if (hovered) {
+        g2.setColor(new Color(255, 255, 255, 40));
+        g2.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 6, 6);
+        g2.setColor(new Color(210, 160, 255, 220));
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 6, 6);
+        g2.setStroke(new BasicStroke(1f));
+    }
+
+    // Text with drop shadow
+    g2.setFont(new Font("Arial", Font.BOLD, 14));
+    FontMetrics fm = g2.getFontMetrics();
+    int tx = rect.x + (rect.width - fm.stringWidth(text)) / 2;
+    int ty = rect.y + (rect.height + fm.getAscent()) / 2 - 4;
+
+    g2.setColor(new Color(0, 0, 0, 160));
+    g2.drawString(text, tx + 1, ty + 1);
+    g2.setColor(hovered ? new Color(255, 238, 180) : Color.WHITE);
+    g2.drawString(text, tx, ty);
+}
+    private void showShopMessage(String msg, boolean isError) {
+    shopMessage = msg;
+    shopMessageTimer = MESSAGE_DURATION;
+    shopMessageIsError = isError;
+}
     private void drawHUD(Graphics2D g2) {
         int bW = 160, bH = 36, bX = 16, bY = 16;
         menuBtnRect = new Rectangle(bX, bY, bW, bH);
