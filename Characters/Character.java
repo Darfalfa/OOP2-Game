@@ -18,6 +18,7 @@ abstract public class Character {
     private int gold;
     private int healthPotion = 0;
     private int expPotion = 0;
+    private int turnCounter = 0;
 
     public Character(String name, int hp, int defense, int baseExp, int level) {
         this.name = name;
@@ -250,6 +251,26 @@ abstract public class Character {
         } else {
             return "No EXP potions left!";
         }
+    }
+
+    public String handleAutoHeal() {
+        turnCounter++;
+
+        if (turnCounter % 3 == 0) {
+            int oldHp = hp;
+
+            setHp(hp + 15);
+
+            int healed = hp - oldHp;
+
+            return "Wens appears and restores " + healed + " HP to " + name + "!";
+        }
+
+        return null;
+    }
+
+    public void resetTurnCounter() {
+        turnCounter = 0;
     }
 
     public abstract String getSkillDamageRange(int skillNumber);
