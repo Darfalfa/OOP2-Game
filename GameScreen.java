@@ -86,6 +86,9 @@ public class GameScreen extends JPanel implements Runnable {
     private boolean wensDialogueOpen = false;
     private boolean wensDialogueSeen = false;
     private Image wensDialogueImg;
+
+    private boolean khaiDialogueOpen = false;
+    private Image khaiDialogueImg;
     
     // Feedback message shown at the top of the shop (not blocking buttons)
     private String shopFeedback = "";
@@ -135,6 +138,7 @@ public class GameScreen extends JPanel implements Runnable {
             exitBtnImg = new ImageIcon("images/shop_button_exit_placeholder.png").getImage();
             itemCardImg = new ImageIcon("images/Shop_Item_Placeholder.png").getImage();
             wensDialogueImg = new ImageIcon("images/Wens_dialogue.png").getImage();
+            khaiDialogueImg = new ImageIcon("images/Khai_dialogue.png").getImage();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -190,6 +194,10 @@ public class GameScreen extends JPanel implements Runnable {
             Point p = e.getPoint();
     if (wensDialogueOpen) {
         wensDialogueOpen = false;
+        return;
+    }
+    if (khaiDialogueOpen) {
+        khaiDialogueOpen = false;
         return;
     }
 
@@ -367,9 +375,15 @@ if (sellExpBtn != null && sellExpBtn.contains(p)) {
         }
     }
 
-    public void onBattleEnd(Enemy defeated, boolean won) {
+public void onBattleEnd(Enemy defeated, boolean won) {
         inBattle = false;
         postBattleCooldown = 120; // about 2 seconds
+
+        // Reset all held keys so the player doesn't auto-walk after returning
+        keyH.upPressed    = false;
+        keyH.downPressed  = false;
+        keyH.leftPressed  = false;
+        keyH.rightPressed = false;
 
         if (won) {
     defeated.defeated = true;
@@ -497,8 +511,8 @@ if (sellExpBtn != null && sellExpBtn.contains(p)) {
     //    }
     //}
 
-    public void openShopDialogue() {
-    if (!shopOpen && !shopDialogueOpen) {
+public void openShopDialogue() {
+    if (!shopOpen && !shopDialogueOpen && !wensDialogueOpen && !khaiDialogueOpen) {
         shopDialogueOpen = true;
         selectedOption = 0;
         repaint();
@@ -506,8 +520,17 @@ if (sellExpBtn != null && sellExpBtn.contains(p)) {
 }
 
 public void openWensDialogue() {
-    wensDialogueOpen = true;
-    repaint();
+    if (!shopDialogueOpen && !shopOpen && !khaiDialogueOpen) {
+        wensDialogueOpen = true;
+        repaint();
+    }
+}
+
+public void openKhaiDialogue() {
+    if (!shopDialogueOpen && !shopOpen && !wensDialogueOpen) {
+        khaiDialogueOpen = true;
+        repaint();
+    }
 }
 
     public void handleShopInput(int keyCode) {
@@ -570,9 +593,12 @@ if (keyCode == KeyEvent.VK_ESCAPE) {
         repaint();
     }
 
-    public void handleInfoInput(int keyCode) {
+public void handleInfoInput(int keyCode) {
         if (keyCode == KeyEvent.VK_I) {
             infoOpen = !infoOpen;
+        }
+        if (keyCode == KeyEvent.VK_R) {
+            openKhaiDialogue();
         }
     }
 
@@ -599,6 +625,10 @@ if (keyCode == KeyEvent.VK_ESCAPE) {
 
 if (wensDialogueOpen) {
     drawWensDialogue(g2);
+}
+
+if (khaiDialogueOpen) {
+    drawKhaiDialogue(g2);
 }
 
 // DRAW SHOP
@@ -764,31 +794,98 @@ private void drawWensDialogue(Graphics2D g2) {
     int screenW = getWidth();
     int screenH = getHeight();
 
-    // Keep the original image aspect ratio (1540 x 660 from your image)
-    int boxW = (int)(screenW * 0.90);
-    int boxH = (int)(boxW * (660.0 / 1540.0));
-    int boxX = (screenW - boxW) / 2;
-    int boxY = screenH - boxH - 30;
+    // Exact same dimensions as Mako's dialogue box
+    int imgW = 760;
+    int imgH = (int)(imgW * 468.0 / 1108.0); // ~321px — same ratio as makoChatboxImg
 
+    int imgX = (screenW - imgW) / 2;
+    int imgY = screenH - imgH - 40;
+
+    // Draw Wens' dialogue image at the same size as Mako's
     if (wensDialogueImg != null) {
-        g2.drawImage(wensDialogueImg, boxX, boxY, boxW, boxH, null);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.drawImage(wensDialogueImg, imgX, imgY, imgW, imgH, null);
+    } else {
+        // Fallback plain box (same as Mako's fallback)
+        g2.setColor(new Color(20, 16, 42, 235));
+        g2.fillRoundRect(imgX, imgY, imgW, imgH, 14, 14);
+        g2.setColor(new Color(90, 100, 150));
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(imgX, imgY, imgW, imgH, 14, 14);
     }
 
-    // Text starts after the portrait which takes up ~38% of the image width
-    int textX = boxX + (int)(boxW * 0.40);
-    int textY = boxY + (int)(boxH * 0.35);
-    int textMaxW = (int)(boxW * 0.57);
+// Wens' image: portrait takes left ~38%, text box starts after that
+    int portraitEndX = imgX + (int)(imgW * 0.38);
+    int boxTopY      = imgY + (int)(imgH * 148.0 / 468.0);
+    int boxBotY      = imgY + (int)(imgH * 460.0 / 468.0);
+    int boxH         = boxBotY - boxTopY;
 
-    String line = "Traveler, you've proven your strength. From here on, you won't walk alone. "
-                + "I am your companion now\u2014ready to face whatever trials await us.";
+    int textX    = portraitEndX + 12;
+    int textMaxW = imgX + imgW - textX - 16;
 
-    g2.setFont(new Font("Arial", Font.PLAIN, 16));
-    g2.setColor(new Color(220, 210, 190));
-    drawWensWrappedText(g2, line, textX, textY, textMaxW);
+    // Same font as Mako's dialogue text
+    int textStartY = boxTopY + (int)(boxH * 0.20);
+    int lineGap    = (int)(boxH * 0.14);
 
-    g2.setFont(new Font("Arial", Font.ITALIC, 12));
-    g2.setColor(new Color(180, 180, 180, 200));
-    g2.drawString("Click to continue", boxX + boxW - 140, boxY + boxH - 14);
+    g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                        RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    g2.setFont(new Font("Serif", Font.PLAIN, 15));
+    g2.setColor(new Color(215, 210, 235));
+    g2.drawString("Traveler, you've proven your strength.", textX, textStartY);
+    g2.drawString("From here on, you won't walk alone.",   textX, textStartY + lineGap);
+    g2.drawString("I am your companion now\u2014ready to face whatever trials await us.", textX, textStartY + lineGap * 2);
+
+    // Same "Click to continue" style as Mako's box
+    g2.setFont(new Font("Serif", Font.ITALIC, 13));
+    g2.setColor(new Color(180, 170, 200, 200));
+    g2.drawString("Click to continue", imgX + imgW - 148, boxBotY - 6);
+}
+
+private void drawKhaiDialogue(Graphics2D g2) {
+    int screenW = getWidth();
+    int screenH = getHeight();
+
+    int imgW = 760;
+    int imgH = (int)(imgW * 468.0 / 1108.0);
+
+    int imgX = (screenW - imgW) / 2;
+    int imgY = screenH - imgH - 40;
+
+    if (khaiDialogueImg != null) {
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2.drawImage(khaiDialogueImg, imgX, imgY, imgW, imgH, null);
+    } else {
+        g2.setColor(new Color(20, 16, 42, 235));
+        g2.fillRoundRect(imgX, imgY, imgW, imgH, 14, 14);
+        g2.setColor(new Color(90, 100, 150));
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(imgX, imgY, imgW, imgH, 14, 14);
+    }
+
+    int portraitEndX = imgX + (int)(imgW * 0.38);
+    int boxTopY      = imgY + (int)(imgH * 148.0 / 468.0);
+    int boxBotY      = imgY + (int)(imgH * 460.0 / 468.0);
+    int boxH         = boxBotY - boxTopY;
+
+    int textX    = portraitEndX + 12;
+    int lineGap  = (int)(boxH * 0.14);
+    int textStartY = boxTopY + (int)(boxH * 0.18);
+
+    g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                        RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    g2.setFont(new Font("Serif", Font.PLAIN, 15));
+    g2.setColor(new Color(215, 210, 235));
+    g2.drawString("So\u2026 you\u2019ve finally made it this far.",          textX, textStartY);
+    g2.drawString("You\u2019re stronger now\u2014strong enough to face what lies ahead.", textX, textStartY + lineGap);
+    g2.drawString("The Boss Dungeon is open to you.",                         textX, textStartY + lineGap * 2);
+    g2.drawString("\u2026Go on. Step inside.",                                textX, textStartY + lineGap * 3);
+    g2.drawString("I\u2019ll be waiting.",                                    textX, textStartY + lineGap * 4);
+
+    g2.setFont(new Font("Serif", Font.ITALIC, 13));
+    g2.setColor(new Color(180, 170, 200, 200));
+    g2.drawString("Click to continue", imgX + imgW - 148, boxBotY - 6);
 }
 
 private void drawWensWrappedText(Graphics2D g2, String text, int x, int y, int maxWidth) {
@@ -1033,31 +1130,10 @@ g2.drawString("EXIT", etx, ety);
 
         if (playerCharacter == null) return;
 
-        int w = 600;
-
-        int padding = 40;
+int w = 600;
+        int h = 420;
+        int padding = 20;
         int maxTextWidth = w - padding * 2;
-
-        // ===== MEASURE FIRST =====
-        g2.setFont(new Font("Arial", Font.PLAIN, 16));
-        int bgTextHeight = measureWrappedText(
-                g2,
-                playerCharacter.getBackgroundInfo(),
-                maxTextWidth
-        );
-
-        // calculate total height
-        int h = 120
-                + bgTextHeight
-                + 20
-                + 30
-                + (3 * 50)
-                + 20
-                + 80
-                + 40;
-
-        // clamp to screen
-        h = Math.min(h, getHeight() - 80);
 
         int x = (getWidth() - w) / 2;
         int y = (getHeight() - h) / 2;
@@ -1069,59 +1145,59 @@ g2.drawString("EXIT", etx, ety);
         g2.setColor(Color.WHITE);
         g2.drawRoundRect(x, y, w, h, 20, 20);
 
-        // ===== TITLE =====
-        g2.setFont(new Font("Arial", Font.BOLD, 22));
-        g2.drawString(playerCharacter.getName(), x + 20, y + 40);
+// ===== TITLE =====
+        g2.setFont(new Font("Arial", Font.BOLD, 18));
+        g2.drawString(playerCharacter.getName(), x + padding, y + 32);
 
         // ===== BACKGROUND =====
-        int bgX = x + 20;
-        int bgY = y + 80;
+        int bgX = x + padding;
+        int bgY = y + 55;
 
-        g2.setFont(new Font("Arial", Font.PLAIN, 16));
+        g2.setFont(new Font("Arial", Font.BOLD, 13));
         g2.drawString("Background", bgX, bgY);
 
+        g2.setFont(new Font("Arial", Font.PLAIN, 13));
         int textHeight = drawWrappedText(
                 g2,
                 playerCharacter.getBackgroundInfo(),
                 bgX,
-                bgY + 20,
+                bgY + 16,
                 maxTextWidth
         );
 
         // ===== SKILLS =====
-        int skillX = x + 20;
-        int skillY = bgY + 20 + textHeight + 20;
+        int skillX = x + padding;
+        int skillY = bgY + 16 + textHeight + 12;
 
-        g2.setFont(new Font("Arial", Font.BOLD, 16));
+        g2.setFont(new Font("Arial", Font.BOLD, 13));
         g2.drawString("Skills", skillX, skillY);
 
-        g2.setFont(new Font("Arial", Font.PLAIN, 14));
+        g2.setFont(new Font("Arial", Font.PLAIN, 12));
 
-        int yOffset = skillY + 30;
+        int yOffset = skillY + 18;
 
         for (int i = 1; i <= 3; i++) {
             String name = playerCharacter.getSkillName(i);
             String dmg  = playerCharacter.getSkillDamageRange(i);
 
-            g2.drawString(i + ": " + name, skillX, yOffset);
-            g2.drawString("DMG: " + dmg, skillX, yOffset + 18);
-
-            yOffset += 50;
+            g2.drawString(i + ": " + name + "   DMG: " + dmg, skillX, yOffset);
+            yOffset += 20;
         }
 
         // ===== ITEMS =====
-        int itemY = yOffset + 10;
+        int itemY = yOffset + 8;
 
-        g2.setFont(new Font("Arial", Font.BOLD, 16));
-        g2.drawString("Items", x + 20, itemY);
+        g2.setFont(new Font("Arial", Font.BOLD, 13));
+        g2.drawString("Items", x + padding, itemY);
 
-        g2.setFont(new Font("Arial", Font.PLAIN, 14));
-        g2.drawString("HP Potion: " + playerCharacter.getHealthPotion(), x + 20, itemY + 30);
-        g2.drawString("EXP Potion: " + playerCharacter.getExpPotion(), x + 20, itemY + 55);
+        g2.setFont(new Font("Arial", Font.PLAIN, 12));
+        g2.drawString("HP Potion: " + playerCharacter.getHealthPotion() +
+                      "   EXP Potion: " + playerCharacter.getExpPotion(),
+                      x + padding, itemY + 18);
 
         // ===== CLOSE =====
-        g2.setFont(new Font("Arial", Font.ITALIC, 12));
-        g2.drawString("Press I to close", x + w - 140, y + h - 20);
+        g2.setFont(new Font("Arial", Font.ITALIC, 11));
+        g2.drawString("Press I to close", x + w - 130, y + h - 12);
     }
 
     private int measureWrappedText(Graphics2D g2, String text, int maxWidth) {
