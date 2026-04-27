@@ -63,7 +63,7 @@ public class GameScreen extends JPanel implements Runnable {
         setFocusable(true);
         addKeyListener(keyH);
 
-        tileM = new TileManager(this, "/maps/World_2.tmx");
+        tileM = new TileManager(this, "/maps/Map_World2_Collision.tmx");
         keyH.setTileManager(tileM);
         worldWidth = tileSize * maxWorldCol;
         worldHeight = tileSize * maxWorldRow;

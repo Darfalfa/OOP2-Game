@@ -30,7 +30,7 @@ public class TileManager {
     ArrayList<String> collisionStatus = new ArrayList<>();
 
     public TileManager(GameScreen gs) {
-        this(gs, "/maps/World_2.tmx");
+        this(gs, "/maps/Map_World2_Collision.tmx");
     }
 
     public TileManager(GameScreen gs, String mapFilePath) {
@@ -364,7 +364,7 @@ public class TileManager {
                     BufferedImage rawTile = tilesetImage.getSubimage(sx, sy, tilesetInfo.tileWidth, tilesetInfo.tileHeight);
                     Tile tileEntry = new Tile();
                     tileEntry.image = scaleTile(rawTile);
-                    tileEntry.collision = false;
+                    tileEntry.collision = gid > 0 && gid <= tileCollidable.length && tileCollidable[gid - 1];
                     tile[gid - 1] = tileEntry;
                 }
             }
