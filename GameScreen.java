@@ -23,8 +23,8 @@ public class GameScreen extends JPanel implements Runnable {
     // world settings
     public int maxWorldCol = 50;
     public int maxWorldRow = 50;
-    final int worldWidth = tileSize * maxWorldCol;
-    final int worldHeight = tileSize * maxWorldRow;
+    int worldWidth;
+    int worldHeight;
 
     private Thread gameThread;
     private final KeyHandler keyH = new KeyHandler();
@@ -63,8 +63,11 @@ public class GameScreen extends JPanel implements Runnable {
         setFocusable(true);
         addKeyListener(keyH);
 
+        tileM = new TileManager(this, "/maps/World_2.tmx");
+        keyH.setTileManager(tileM);
+        worldWidth = tileSize * maxWorldCol;
+        worldHeight = tileSize * maxWorldRow;
         camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
-        tileM = new TileManager(this);
 
         addMouseMotionListener(new MouseMotionAdapter() {
             @Override
@@ -142,6 +145,10 @@ public class GameScreen extends JPanel implements Runnable {
                     if (tile != null && tile.collision) {
                         return true;
                     }
+                }
+
+                if (tileM.collisionMap != null && tileM.collisionMap[col][row]) {
+                    return true;
                 }
             }
         }

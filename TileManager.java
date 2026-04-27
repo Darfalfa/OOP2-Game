@@ -1,35 +1,51 @@
 import javax.imageio.ImageIO;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.List;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 public class TileManager {
 
     GameScreen gs;
     public Tile[] tile;
     public int[][] mapTileNum;
+    public boolean[][] collisionMap;
+    private boolean[] tileCollidable;
     boolean drawPath = false;
+    private boolean showCollision = false;
 
     ArrayList<String> fileNames = new ArrayList<>();
     ArrayList<String> collisionStatus = new ArrayList<>();
 
     public TileManager(GameScreen gs) {
+        this(gs, "/maps/World_2.tmx");
+    }
+
+    public TileManager(GameScreen gs, String mapFilePath) {
         this.gs = gs;
 
-        loadTileData();
+        if (!mapFilePath.toLowerCase().endsWith(".tmx") || !loadTmx(mapFilePath)) {
+            loadTileData();
 
-        int tileArraySize = Math.max(10, fileNames.size());
-        tile = new Tile[tileArraySize];
-        mapTileNum = new int[gs.maxWorldCol][gs.maxWorldRow];
+            int tileArraySize = Math.max(10, fileNames.size());
+            tile = new Tile[tileArraySize];
+            mapTileNum = new int[gs.maxWorldCol][gs.maxWorldRow];
 
-        getTileImage();
-        loadMap("/maps/map.txt");
+            getTileImage();
+            loadMap("/maps/map.txt");
+        }
     }
 
     private void loadTileData() {
@@ -176,6 +192,14 @@ public class TileManager {
     }
 
     public void loadMap(String filePath) {
+        if (filePath.toLowerCase().endsWith(".tmx")) {
+            if (!loadTmx(filePath)) {
+                System.out.println("Failed to load TMX map: " + filePath);
+                loadMockMap();
+            }
+            return;
+        }
+
         try (InputStream is = getClass().getResourceAsStream(filePath)) {
 
             if (is == null) {
@@ -234,6 +258,254 @@ public class TileManager {
         }
     }
 
+    private boolean loadTmx(String filePath) {
+        InputStream is = getClass().getResourceAsStream(filePath);
+        if (is == null) {
+            File tmxFile = new File("." + filePath);
+            if (tmxFile.exists()) {
+                try {
+                    is = new FileInputStream(tmxFile);
+                } catch (IOException ignored) {
+                }
+            }
+        }
+
+        if (is == null) {
+            System.out.println("Could not find TMX file: " + filePath);
+            return false;
+        }
+
+        try (InputStream resourceStream = is) {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setIgnoringComments(true);
+            factory.setIgnoringElementContentWhitespace(true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document document = builder.parse(is);
+            Element mapElement = document.getDocumentElement();
+
+            int mapCols = Integer.parseInt(mapElement.getAttribute("width"));
+            int mapRows = Integer.parseInt(mapElement.getAttribute("height"));
+            int mapTileW = Integer.parseInt(mapElement.getAttribute("tilewidth"));
+            int mapTileH = Integer.parseInt(mapElement.getAttribute("tileheight"));
+
+            gs.maxWorldCol = mapCols;
+            gs.maxWorldRow = mapRows;
+            mapTileNum = new int[gs.maxWorldCol][gs.maxWorldRow];
+            collisionMap = new boolean[gs.maxWorldCol][gs.maxWorldRow];
+
+            for (int col = 0; col < gs.maxWorldCol; col++) {
+                for (int row = 0; row < gs.maxWorldRow; row++) {
+                    mapTileNum[col][row] = -1;
+                }
+            }
+
+            NodeList tilesetNodes = mapElement.getElementsByTagName("tileset");
+            List<TilesetInfo> tilesetInfos = new ArrayList<>();
+            List<Integer> collisionGids = new ArrayList<>();
+            int totalTiles = 0;
+
+            for (int i = 0; i < tilesetNodes.getLength(); i++) {
+                Element tilesetElem = (Element) tilesetNodes.item(i);
+                int firstgid = Integer.parseInt(tilesetElem.getAttribute("firstgid"));
+                int tilecount = Integer.parseInt(tilesetElem.getAttribute("tilecount"));
+                int tilewidth = tilesetElem.hasAttribute("tilewidth") ? Integer.parseInt(tilesetElem.getAttribute("tilewidth")) : mapTileW;
+                int tileheight = tilesetElem.hasAttribute("tileheight") ? Integer.parseInt(tilesetElem.getAttribute("tileheight")) : mapTileH;
+                int columns = tilesetElem.hasAttribute("columns") ? Integer.parseInt(tilesetElem.getAttribute("columns")) : 0;
+
+                Element imageElem = (Element) tilesetElem.getElementsByTagName("image").item(0);
+                String imageSource = imageElem.getAttribute("source");
+
+                NodeList tileNodes = tilesetElem.getElementsByTagName("tile");
+                for (int j = 0; j < tileNodes.getLength(); j++) {
+                    Element tileElem = (Element) tileNodes.item(j);
+                    int localId = Integer.parseInt(tileElem.getAttribute("id"));
+                    int gid = firstgid + localId;
+                    if (gid > 0) {
+                        boolean hasCollision = tileElem.getElementsByTagName("objectgroup").getLength() > 0
+                                             || tileElem.getElementsByTagName("properties").getLength() > 0;
+                        if (hasCollision) {
+                            collisionGids.add(gid);
+                        }
+                    }
+                }
+
+                tilesetInfos.add(new TilesetInfo(firstgid, tilecount, columns, tilewidth, tileheight, imageSource));
+                totalTiles = Math.max(totalTiles, firstgid + tilecount - 1);
+            }
+
+            tile = new Tile[totalTiles];
+            tileCollidable = new boolean[totalTiles];
+            for (int gid : collisionGids) {
+                if (gid > 0 && gid <= tileCollidable.length) {
+                    tileCollidable[gid - 1] = true;
+                }
+            }
+            for (TilesetInfo tilesetInfo : tilesetInfos) {
+                BufferedImage tilesetImage = loadTilesetImage(tilesetInfo.imageSource, filePath);
+                if (tilesetImage == null) {
+                    System.out.println("Could not load tileset image: " + tilesetInfo.imageSource);
+                    continue;
+                }
+
+                int cols = tilesetInfo.columns;
+                if (cols <= 0) {
+                    cols = tilesetImage.getWidth() / tilesetInfo.tileWidth;
+                }
+
+                for (int tileIndex = 0; tileIndex < tilesetInfo.tileCount; tileIndex++) {
+                    int gid = tilesetInfo.firstgid + tileIndex;
+                    int sx = (tileIndex % cols) * tilesetInfo.tileWidth;
+                    int sy = (tileIndex / cols) * tilesetInfo.tileHeight;
+
+                    if (sx + tilesetInfo.tileWidth > tilesetImage.getWidth() || sy + tilesetInfo.tileHeight > tilesetImage.getHeight()) {
+                        continue;
+                    }
+
+                    BufferedImage rawTile = tilesetImage.getSubimage(sx, sy, tilesetInfo.tileWidth, tilesetInfo.tileHeight);
+                    Tile tileEntry = new Tile();
+                    tileEntry.image = scaleTile(rawTile);
+                    tileEntry.collision = false;
+                    tile[gid - 1] = tileEntry;
+                }
+            }
+
+            NodeList layerNodes = mapElement.getElementsByTagName("layer");
+            for (int i = 0; i < layerNodes.getLength(); i++) {
+                Element layerElem = (Element) layerNodes.item(i);
+                String layerName = layerElem.getAttribute("name");
+                int layerWidth = Integer.parseInt(layerElem.getAttribute("width"));
+                int layerHeight = Integer.parseInt(layerElem.getAttribute("height"));
+
+                Element dataElem = (Element) layerElem.getElementsByTagName("data").item(0);
+                if (dataElem == null) {
+                    continue;
+                }
+
+                String dataText = dataElem.getTextContent().trim();
+                String[] tileValues = dataText.replaceAll("[\r\n]+", "").split("\\s*,\\s*");
+
+                for (int row = 0; row < layerHeight; row++) {
+                    for (int col = 0; col < layerWidth; col++) {
+                        int index = row * layerWidth + col;
+                        if (index >= tileValues.length) {
+                            continue;
+                        }
+                        int gid = Integer.parseInt(tileValues[index]);
+                        if (gid <= 0) {
+                            continue;
+                        }
+
+                        if (layerName.equalsIgnoreCase("collision") || layerName.toLowerCase().contains("collision")) {
+                            if (col < gs.maxWorldCol && row < gs.maxWorldRow) {
+                                collisionMap[col][row] = (gid > 0);
+                            }
+                        } else if (col < gs.maxWorldCol && row < gs.maxWorldRow) {
+                            mapTileNum[col][row] = gid - 1;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private BufferedImage loadTilesetImage(String imageSource, String mapFilePath) throws IOException {
+        String basePath = mapFilePath;
+        if (basePath.contains("/")) {
+            basePath = basePath.substring(0, basePath.lastIndexOf('/'));
+        }
+
+        String candidate = basePath + "/" + imageSource;
+        candidate = candidate.replace("\\", "/");
+        try {
+            candidate = new File(candidate).toPath().normalize().toString().replace("\\", "/");
+        } catch (Exception ignored) {
+        }
+
+        InputStream is = getClass().getResourceAsStream(candidate);
+        if (is == null && !candidate.startsWith("/")) {
+            is = getClass().getResourceAsStream("/" + candidate);
+        }
+        if (is != null) {
+            BufferedImage img = ImageIO.read(is);
+            if (img != null) {
+                return img;
+            }
+        }
+
+        File file = new File(".", candidate);
+        if (!file.exists()) {
+            file = new File("maps", imageSource);
+        }
+        if (!file.exists()) {
+            file = findFileInTiles(imageSource);
+        }
+        if (!file.exists()) {
+            file = findFileInTiles(new File(imageSource).getName());
+        }
+        if (file.exists()) {
+            BufferedImage img = ImageIO.read(file);
+            if (img != null) {
+                return img;
+            }
+        }
+
+        return null;
+    }
+
+    private File findFileInTiles(String fileName) {
+        File tilesFolder = new File("tiles");
+        if (!tilesFolder.exists() || !tilesFolder.isDirectory()) {
+            return new File("", fileName);
+        }
+        return findFileRecursively(tilesFolder, fileName);
+    }
+
+    private File findFileRecursively(File folder, String fileName) {
+        File candidate = new File(folder, fileName);
+        if (candidate.exists()) {
+            return candidate;
+        }
+
+        File[] children = folder.listFiles();
+        if (children == null) {
+            return candidate;
+        }
+
+        for (File child : children) {
+            if (child.isDirectory()) {
+                File result = findFileRecursively(child, fileName);
+                if (result.exists()) {
+                    return result;
+                }
+            }
+        }
+
+        return candidate;
+    }
+
+    private static class TilesetInfo {
+        final int firstgid;
+        final int tileCount;
+        final int columns;
+        final int tileWidth;
+        final int tileHeight;
+        final String imageSource;
+
+        TilesetInfo(int firstgid, int tileCount, int columns, int tileWidth, int tileHeight, String imageSource) {
+            this.firstgid = firstgid;
+            this.tileCount = tileCount;
+            this.columns = columns;
+            this.tileWidth = tileWidth;
+            this.tileHeight = tileHeight;
+            this.imageSource = imageSource;
+        }
+    }
+
     public void draw(Graphics2D g2, Camera camera) {
         int col = 0;
         int row = 0;
@@ -263,5 +535,37 @@ public class TileManager {
                 row++;
             }
         }
+
+        if (showCollision) {
+            col = 0;
+            row = 0;
+            while (col < gs.maxWorldCol && row < gs.maxWorldRow) {
+                if (collisionMap[col][row]) {
+                    int worldX = col * gs.tileSize;
+                    int worldY = row * gs.tileSize;
+                    int screenX = worldX - camera.offsetX();
+                    int screenY = worldY - camera.offsetY();
+
+                    if (worldX + gs.tileSize > camera.offsetX() &&
+                        worldX - gs.tileSize < camera.offsetX() + GameScreen.SCREEN_WIDTH &&
+                        worldY + gs.tileSize > camera.offsetY() &&
+                        worldY - gs.tileSize < camera.offsetY() + GameScreen.SCREEN_HEIGHT) {
+
+                        g2.setColor(Color.RED);
+                        g2.drawRect(screenX, screenY, gs.tileSize, gs.tileSize);
+                    }
+                }
+
+                col++;
+                if (col == gs.maxWorldCol) {
+                    col = 0;
+                    row++;
+                }
+            }
+        }
+    }
+
+    public void toggleCollisionVisibility() {
+        showCollision = !showCollision;
     }
 }

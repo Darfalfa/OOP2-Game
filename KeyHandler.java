@@ -8,6 +8,12 @@ public class KeyHandler implements KeyListener {
     public boolean leftPressed;
     public boolean rightPressed;
 
+    private TileManager tileM;
+
+    public void setTileManager(TileManager tileM) {
+        this.tileM = tileM;
+    }
+
     @Override
     public void keyTyped(KeyEvent e) {}
 
@@ -20,6 +26,10 @@ public class KeyHandler implements KeyListener {
         if (code == KeyEvent.VK_S) downPressed = true;
         if (code == KeyEvent.VK_A) leftPressed = true;
         if (code == KeyEvent.VK_D) rightPressed = true;
+
+        if (code == KeyEvent.VK_MINUS) {
+            if (tileM != null) tileM.toggleCollisionVisibility();
+        }
     }
 
     @Override
