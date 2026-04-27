@@ -63,7 +63,7 @@ public class GameScreen extends JPanel implements Runnable {
         setFocusable(true);
         addKeyListener(keyH);
 
-        tileM = new TileManager(this, "/maps/Map_World2_Collision.tmx");
+        tileM = new TileManager(this, "/maps/Detailed_Map2_Collision.tmx");
         keyH.setTileManager(tileM);
         worldWidth = tileSize * maxWorldCol;
         worldHeight = tileSize * maxWorldRow;
@@ -132,28 +132,7 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     public boolean isTileCollision(int x, int y, int width, int height) {
-        int leftCol   = Math.max(0, x / tileSize);
-        int rightCol  = Math.min(maxWorldCol - 1, (x + width - 1) / tileSize);
-        int topRow    = Math.max(0, y / tileSize);
-        int bottomRow = Math.min(maxWorldRow - 1, (y + height - 1) / tileSize);
-
-        for (int col = leftCol; col <= rightCol; col++) {
-            for (int row = topRow; row <= bottomRow; row++) {
-                int tileNum = tileM.mapTileNum[col][row];
-                if (tileNum >= 0 && tileNum < tileM.tile.length) {
-                    Tile tile = tileM.tile[tileNum];
-                    if (tile != null && tile.collision) {
-                        return true;
-                    }
-                }
-
-                if (tileM.collisionMap != null && tileM.collisionMap[col][row]) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return tileM.isCollision(x, y, width, height);
     }
 
     public void startGame() {

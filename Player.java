@@ -104,7 +104,7 @@ public abstract class Player {
         if (maxX < minX || maxY < minY)
             return new BufferedImage(SPRITE_W, SPRITE_H, BufferedImage.TYPE_INT_ARGB);
 
-        BufferedImage cropped = stripped.getSubimage(minX, minY, maxX - minX + 1, maxY - minY + 1);
+        BufferedImage cropped = stripped.getSubimage(minX, minY, maxX - minX + 2, maxY - minY + 2);
         BufferedImage out = new BufferedImage(SPRITE_W, SPRITE_H, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = out.createGraphics();
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,

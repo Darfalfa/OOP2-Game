@@ -3,6 +3,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.Shape;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
@@ -12,6 +13,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.awt.geom.AffineTransform;
+import java.awt.geom.Area;
+import java.awt.geom.Path2D;
+import java.awt.geom.Rectangle2D;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -23,6 +28,8 @@ public class TileManager {
     public int[][] mapTileNum;
     public boolean[][] collisionMap;
     private boolean[] tileCollidable;
+    private List<CollisionShapeTemplate>[] tileCollisionTemplates;
+    private List<Shape>[][] collisionShapesByCell;
     boolean drawPath = false;
     private boolean showCollision = false;
 
@@ -30,7 +37,7 @@ public class TileManager {
     ArrayList<String> collisionStatus = new ArrayList<>();
 
     public TileManager(GameScreen gs) {
-        this(gs, "/maps/Map_World2_Collision.tmx");
+        this(gs, "/maps/Detailed_Map2_Collision.tmx");
     }
 
     public TileManager(GameScreen gs, String mapFilePath) {
@@ -302,6 +309,7 @@ public class TileManager {
             NodeList tilesetNodes = mapElement.getElementsByTagName("tileset");
             List<TilesetInfo> tilesetInfos = new ArrayList<>();
             List<Integer> collisionGids = new ArrayList<>();
+            List<GidCollisionTemplates> gidTemplateGroups = new ArrayList<>();
             int totalTiles = 0;
 
             for (int i = 0; i < tilesetNodes.getLength(); i++) {
@@ -321,6 +329,11 @@ public class TileManager {
                     int localId = Integer.parseInt(tileElem.getAttribute("id"));
                     int gid = firstgid + localId;
                     if (gid > 0) {
+                        List<CollisionShapeTemplate> templates = parseCollisionTemplates(tileElem, tilewidth, tileheight);
+                        if (!templates.isEmpty()) {
+                            gidTemplateGroups.add(new GidCollisionTemplates(gid, templates));
+                        }
+
                         boolean hasCollision = tileElem.getElementsByTagName("objectgroup").getLength() > 0
                                              || tileElem.getElementsByTagName("properties").getLength() > 0;
                         if (hasCollision) {
@@ -335,11 +348,19 @@ public class TileManager {
 
             tile = new Tile[totalTiles];
             tileCollidable = new boolean[totalTiles];
+            tileCollisionTemplates = new ArrayList[totalTiles];
             for (int gid : collisionGids) {
                 if (gid > 0 && gid <= tileCollidable.length) {
                     tileCollidable[gid - 1] = true;
                 }
             }
+            for (GidCollisionTemplates templateGroup : gidTemplateGroups) {
+                if (templateGroup.gid > 0 && templateGroup.gid <= tileCollisionTemplates.length) {
+                    tileCollisionTemplates[templateGroup.gid - 1] = templateGroup.templates;
+                }
+            }
+
+            collisionShapesByCell = new ArrayList[gs.maxWorldCol][gs.maxWorldRow];
             for (TilesetInfo tilesetInfo : tilesetInfos) {
                 BufferedImage tilesetImage = loadTilesetImage(tilesetInfo.imageSource, filePath);
                 if (tilesetImage == null) {
@@ -390,7 +411,9 @@ public class TileManager {
                         if (index >= tileValues.length) {
                             continue;
                         }
-                        int gid = Integer.parseInt(tileValues[index]);
+                        long rawGid = Long.parseLong(tileValues[index].trim());
+                        // Tiled stores flip flags in the top 3 bits of the gid.
+                        int gid = (int) (rawGid & 0x1FFFFFFF);
                         if (gid <= 0) {
                             continue;
                         }
@@ -398,8 +421,15 @@ public class TileManager {
                         if (layerName.equalsIgnoreCase("collision") || layerName.toLowerCase().contains("collision")) {
                             if (col < gs.maxWorldCol && row < gs.maxWorldRow) {
                                 collisionMap[col][row] = (gid > 0);
+                                addFullTileCollisionShape(col, row);
                             }
                         } else if (col < gs.maxWorldCol && row < gs.maxWorldRow) {
+                            if (gid <= tileCollisionTemplates.length && tileCollisionTemplates[gid - 1] != null
+                                && !tileCollisionTemplates[gid - 1].isEmpty()) {
+                                addCollisionShapesForCell(col, row, tileCollisionTemplates[gid - 1]);
+                            } else if (gid <= tileCollidable.length && tileCollidable[gid - 1]) {
+                                collisionMap[col][row] = true;
+                            }
                             mapTileNum[col][row] = gid - 1;
                         }
                     }
@@ -410,6 +440,189 @@ public class TileManager {
         } catch (Exception e) {
             e.printStackTrace();
             return false;
+        }
+    }
+
+    public boolean isCollision(int x, int y, int width, int height) {
+        Rectangle2D.Float playerRect = new Rectangle2D.Float(x, y, width, height);
+
+        int leftCol = Math.max(0, x / gs.tileSize);
+        int rightCol = Math.min(gs.maxWorldCol - 1, (x + width - 1) / gs.tileSize);
+        int topRow = Math.max(0, y / gs.tileSize);
+        int bottomRow = Math.min(gs.maxWorldRow - 1, (y + height - 1) / gs.tileSize);
+
+        for (int col = leftCol; col <= rightCol; col++) {
+            for (int row = topRow; row <= bottomRow; row++) {
+                if (hasShapeCollisionAtCell(col, row, playerRect)) {
+                    return true;
+                }
+
+                if (collisionMap != null && collisionMap[col][row]) {
+                    return true;
+                }
+
+                int tileNum = mapTileNum[col][row];
+                if (tileNum >= 0 && tileNum < tile.length) {
+                    Tile tileAtCell = tile[tileNum];
+                    if (tileAtCell != null && tileAtCell.collision) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean hasShapeCollisionAtCell(int col, int row, Rectangle2D.Float playerRect) {
+        if (collisionShapesByCell == null) {
+            return false;
+        }
+
+        List<Shape> cellShapes = collisionShapesByCell[col][row];
+        if (cellShapes == null || cellShapes.isEmpty()) {
+            return false;
+        }
+
+        for (Shape shape : cellShapes) {
+            if (shapeIntersects(shape, playerRect)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean shapeIntersects(Shape shape, Rectangle2D.Float rect) {
+        if (shape == null) {
+            return false;
+        }
+
+        Rectangle2D bounds = shape.getBounds2D();
+        if (!bounds.intersects(rect)) {
+            return false;
+        }
+
+        Area overlap = new Area(shape);
+        overlap.intersect(new Area(rect));
+        return !overlap.isEmpty();
+    }
+
+    private void addCollisionShapesForCell(int col, int row, List<CollisionShapeTemplate> templates) {
+        if (templates == null || templates.isEmpty()) {
+            return;
+        }
+
+        if (collisionShapesByCell[col][row] == null) {
+            collisionShapesByCell[col][row] = new ArrayList<>();
+        }
+
+        float worldX = col * gs.tileSize;
+        float worldY = row * gs.tileSize;
+
+        for (CollisionShapeTemplate template : templates) {
+            AffineTransform shift = AffineTransform.getTranslateInstance(worldX, worldY);
+            Shape worldShape = shift.createTransformedShape(template.localShape);
+            collisionShapesByCell[col][row].add(worldShape);
+        }
+    }
+
+    private void addFullTileCollisionShape(int col, int row) {
+        if (collisionShapesByCell == null) {
+            return;
+        }
+
+        if (collisionShapesByCell[col][row] == null) {
+            collisionShapesByCell[col][row] = new ArrayList<>();
+        }
+
+        Rectangle2D.Float fullTileRect = new Rectangle2D.Float(col * gs.tileSize, row * gs.tileSize, gs.tileSize, gs.tileSize);
+        collisionShapesByCell[col][row].add(fullTileRect);
+    }
+
+    private List<CollisionShapeTemplate> parseCollisionTemplates(Element tileElem, int tilesetTileW, int tilesetTileH) {
+        List<CollisionShapeTemplate> templates = new ArrayList<>();
+        NodeList objectGroupNodes = tileElem.getElementsByTagName("objectgroup");
+
+        float scaleX = (float) gs.tileSize / (float) tilesetTileW;
+        float scaleY = (float) gs.tileSize / (float) tilesetTileH;
+
+        for (int i = 0; i < objectGroupNodes.getLength(); i++) {
+            Element objectGroupElem = (Element) objectGroupNodes.item(i);
+            NodeList objectNodes = objectGroupElem.getElementsByTagName("object");
+
+            for (int j = 0; j < objectNodes.getLength(); j++) {
+                Element objectElem = (Element) objectNodes.item(j);
+                Shape localShape = parseObjectShape(objectElem, scaleX, scaleY);
+                if (localShape != null) {
+                    templates.add(new CollisionShapeTemplate(localShape));
+                }
+            }
+        }
+
+        return templates;
+    }
+
+    private Shape parseObjectShape(Element objectElem, float scaleX, float scaleY) {
+        float objectX = parseFloatAttr(objectElem, "x", 0f) * scaleX;
+        float objectY = parseFloatAttr(objectElem, "y", 0f) * scaleY;
+
+        NodeList polygonNodes = objectElem.getElementsByTagName("polygon");
+        if (polygonNodes.getLength() > 0) {
+            Element polygonElem = (Element) polygonNodes.item(0);
+            String pointsText = polygonElem.getAttribute("points").trim();
+            if (pointsText.isEmpty()) {
+                return null;
+            }
+
+            String[] points = pointsText.split("\\s+");
+            Path2D.Float polygon = new Path2D.Float();
+            boolean started = false;
+
+            for (String point : points) {
+                String[] xy = point.split(",");
+                if (xy.length != 2) {
+                    continue;
+                }
+
+                float px = parseFloat(xy[0]) * scaleX + objectX;
+                float py = parseFloat(xy[1]) * scaleY + objectY;
+
+                if (!started) {
+                    polygon.moveTo(px, py);
+                    started = true;
+                } else {
+                    polygon.lineTo(px, py);
+                }
+            }
+
+            if (started) {
+                polygon.closePath();
+                return polygon;
+            }
+            return null;
+        }
+
+        float width = parseFloatAttr(objectElem, "width", 0f) * scaleX;
+        float height = parseFloatAttr(objectElem, "height", 0f) * scaleY;
+        if (width <= 0f || height <= 0f) {
+            return null;
+        }
+        return new Rectangle2D.Float(objectX, objectY, width, height);
+    }
+
+    private float parseFloatAttr(Element element, String attrName, float fallback) {
+        if (!element.hasAttribute(attrName)) {
+            return fallback;
+        }
+        return parseFloat(element.getAttribute(attrName));
+    }
+
+    private float parseFloat(String value) {
+        try {
+            return Float.parseFloat(value.trim());
+        } catch (Exception ex) {
+            return 0f;
         }
     }
 
@@ -503,6 +716,24 @@ public class TileManager {
             this.tileWidth = tileWidth;
             this.tileHeight = tileHeight;
             this.imageSource = imageSource;
+        }
+    }
+
+    private static class CollisionShapeTemplate {
+        final Shape localShape;
+
+        CollisionShapeTemplate(Shape localShape) {
+            this.localShape = localShape;
+        }
+    }
+
+    private static class GidCollisionTemplates {
+        final int gid;
+        final List<CollisionShapeTemplate> templates;
+
+        GidCollisionTemplates(int gid, List<CollisionShapeTemplate> templates) {
+            this.gid = gid;
+            this.templates = templates;
         }
     }
 
