@@ -11,7 +11,7 @@ import javax.imageio.ImageIO;
 public class Enemy {
 
     public int x, y;
-    public final int W = 48, H = 48;
+    public static final int W = 48, H = 48;
 
     public Character character;
 

@@ -77,6 +77,7 @@ public class GameScreen extends JPanel implements Runnable {
 
     private boolean inBattle = false;
     private int postBattleCooldown = 0;
+    private boolean navigatingToMenu = false;
 
     // SHOP SYSTEM
     private boolean shopDialogueOpen = false;
@@ -202,8 +203,7 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     if (menuBtnRect != null && menuBtnRect.contains(e.getPoint())) {
-        stopGame();
-        window.showMainMenu();
+        goToMainMenu();
     }
 
                 // ── Dialogue clicks ───────────────────────────────────────────
@@ -340,6 +340,7 @@ if (sellExpBtn != null && sellExpBtn.contains(p)) {
 
     public void startGame() {
 
+    navigatingToMenu = false;
     player.x = worldWidth / 2;
     player.y = worldHeight / 2;
 
@@ -360,16 +361,34 @@ if (sellExpBtn != null && sellExpBtn.contains(p)) {
 
     public void stopGame() {
         gameThread = null;
+        // Do NOT reset navigatingToMenu here — goToMainMenu() sets it before
+        // calling stopGame(), and onBattleEnd()'s invokeLater must still see it.
+    }
+
+    /** Called by the HUD button — sets the flag BEFORE stopping so onBattleEnd ignores it. */
+    public void goToMainMenu() {
+        navigatingToMenu = true;
+        stopGame();
+        window.showMainMenu();
     }
 
     private void spawnEnemies() {
         enemies.clear();
+        // Keep enemies at least 200px from any world edge and at least 300px from the player
+        int margin = 200;
+        int spawnW = Math.max(1, worldWidth  - margin * 2 - Enemy.W);
+        int spawnH = Math.max(1, worldHeight - margin * 2 - Enemy.H);
         for (int i = 0; i < ENEMY_COUNT; i++) {
             int ex, ey;
+            int attempts = 0;
             do {
-                ex = 200 + (int)(Math.random() * (worldWidth - 400));
-                ey = 200 + (int)(Math.random() * (worldHeight - 400));
-            } while (Math.hypot(ex - player.x, ey - player.y) < 300);
+                ex = margin + (int)(Math.random() * spawnW);
+                ey = margin + (int)(Math.random() * spawnH);
+                // Clamp to valid world bounds just in case
+                ex = Math.max(0, Math.min(ex, worldWidth  - Enemy.W));
+                ey = Math.max(0, Math.min(ey, worldHeight - Enemy.H));
+                attempts++;
+            } while (Math.hypot(ex - player.x, ey - player.y) < 300 && attempts < 100);
 
             enemies.add(new Enemy(ex, ey, new ShadowLogic()));
         }
@@ -400,6 +419,8 @@ public void onBattleEnd(Enemy defeated, boolean won) {
 }
 
         SwingUtilities.invokeLater(() -> {
+            if (navigatingToMenu) return; // player clicked Main Menu — don't override it
+
             window.showGameScreen();
 
             GameScreen.this.requestFocusInWindow();
@@ -459,11 +480,19 @@ public void onBattleEnd(Enemy defeated, boolean won) {
                     // restore enemy stats
                     enemy.character.restoreStats();
 
-                    // respawn in random location (not near player)
+                    // respawn in random location (not near player, inside world bounds)
+                    int margin = 200;
+                    int spawnW = Math.max(1, worldWidth  - margin * 2 - Enemy.W);
+                    int spawnH = Math.max(1, worldHeight - margin * 2 - Enemy.H);
+                    int attempts = 0;
                     do {
-                        enemy.x = 200 + (int)(Math.random() * (worldWidth - 400));
-                        enemy.y = 200 + (int)(Math.random() * (worldHeight - 400));
-                    } while (Math.hypot(enemy.x - player.x, enemy.y - player.y) < 250);
+                        enemy.x = margin + (int)(Math.random() * spawnW);
+                        enemy.y = margin + (int)(Math.random() * spawnH);
+                        // Clamp to valid world bounds just in case
+                        enemy.x = Math.max(0, Math.min(enemy.x, worldWidth  - Enemy.W));
+                        enemy.y = Math.max(0, Math.min(enemy.y, worldHeight - Enemy.H));
+                        attempts++;
+                    } while (Math.hypot(enemy.x - player.x, enemy.y - player.y) < 250 && attempts < 100);
                 }
 
                 continue;
