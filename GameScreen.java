@@ -209,6 +209,7 @@ public class GameScreen extends JPanel implements Runnable {
                 // ── Dialogue clicks ───────────────────────────────────────────
                 if (shopDialogueOpen) {
                     if (dialogueShopBtn != null && dialogueShopBtn.contains(p)) {
+                        SoundManager.stopSfx(); 
                         shopDialogueOpen = false;
                         shopOpen = true;
                         dialogueHovered = -1;
@@ -216,6 +217,7 @@ public class GameScreen extends JPanel implements Runnable {
                         return;
                     }
                     if (dialogueCloseBtn != null && dialogueCloseBtn.contains(p)) {
+                        SoundManager.stopSfx(); 
                         shopDialogueOpen = false;
                         dialogueHovered = -1;
                         repaint();
@@ -271,6 +273,7 @@ if (sellExpBtn != null && sellExpBtn.contains(p)) {
 
                     // EXIT
                     if (exitBtn != null && exitBtn.contains(p)) {
+                        SoundManager.stopSfx();
                         shopOpen = false;
                         hoveredBtn = null;
                     }
@@ -515,6 +518,9 @@ public void openShopDialogue() {
     if (!shopOpen && !shopDialogueOpen && !wensDialogueOpen && !khaiDialogueOpen) {
         shopDialogueOpen = true;
         selectedOption = 0;
+
+        SoundManager.playSfx("Mako.wav");
+
         repaint();
     }
 }
@@ -597,6 +603,7 @@ public void handleInfoInput(int keyCode) {
         if (keyCode == KeyEvent.VK_I) {
             infoOpen = !infoOpen;
         }
+        
         if (keyCode == KeyEvent.VK_R) {
             openKhaiDialogue();
         }

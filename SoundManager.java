@@ -6,6 +6,7 @@ public class SoundManager {
     private static Clip currentBgm;
     private static float musicVolume = 0.8f;
     private static float sfxVolume = 0.7f;
+    private static Clip currentSfx;
 
     public static void playBgm(String fileName) {
         try {
@@ -34,15 +35,25 @@ public class SoundManager {
         }
     }
 
+    public static void stopSfx() {
+        if (currentSfx != null) {
+            currentSfx.stop();
+            currentSfx.close();
+            currentSfx = null;
+        }
+    }
+
     public static void playSfx(String fileName) {
         try {
-            File soundFile = new File("sounds/" + fileName);
-            AudioInputStream audio = AudioSystem.getAudioInputStream(soundFile);
 
-            Clip clip = AudioSystem.getClip();
-            clip.open(audio);
-            applyVolume(clip, sfxVolume);
-            clip.start();
+            File soundFile = new File("sounds/" + fileName);
+            AudioInputStream audio =
+                AudioSystem.getAudioInputStream(soundFile);
+
+            currentSfx = AudioSystem.getClip();
+            currentSfx.open(audio);
+            applyVolume(currentSfx, sfxVolume);
+            currentSfx.start();
 
         } catch (Exception e) {
             System.err.println("Error playing SFX: " + fileName);
