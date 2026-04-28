@@ -70,7 +70,6 @@ public abstract class Player {
         loadSprites();
         currentSprite = standingForward;
     }
-
     // ─────────────────────────────────────────────────────────────────────────────
     // Sprite Loading — each subclass fills in their own image paths
     // ─────────────────────────────────────────────────────────────────────────────
