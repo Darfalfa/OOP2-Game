@@ -60,6 +60,16 @@ public class RonnixLogic extends Character {
     }
 
     @Override
+    public String getSkillSfx(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> "Ronnix_SwordSlash.wav";
+            case 2 -> "Ronnix_DeathThrust.wav";
+            case 3 -> "Ronnix_DivineStrike.wav";
+            default -> null;
+        };
+    }
+
+    @Override
     public String getSkillDamageRange(int skillNumber) {
         double multiplier = (1 + 0.07 * (getLevel() - 1));
 

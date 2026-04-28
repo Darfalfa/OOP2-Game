@@ -1,11 +1,11 @@
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
+import javax.imageio.ImageIO;
+import javax.swing.*;
 
 public class MainMenuScreen extends JPanel {
 
@@ -92,8 +92,12 @@ public class MainMenuScreen extends JPanel {
 
     private void handleAction(int index) {
         switch (index) {
-            case 0 -> window.showCharacterSelect();
+            case 0 -> {
+                window.showCharacterSelect();
+            }
+
             case 1 -> window.showSettings();
+
             case 2 -> {
                 int choice = JOptionPane.showConfirmDialog(
                     this, "Are you sure you want to exit?",

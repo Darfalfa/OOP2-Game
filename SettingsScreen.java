@@ -1,7 +1,7 @@
-import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
+import javax.swing.*;
 
 public class SettingsScreen extends JPanel {
 
@@ -16,13 +16,9 @@ public class SettingsScreen extends JPanel {
     private int musicVol  = 80;
     private int sfxVol    = 70;
     private boolean fullscreen = false;
-    private int difficulty = 1; // 0=Easy 1=Normal 2=Hard
-
-    private static final String[] DIFF_LABELS = {"EASY", "NORMAL", "HARD"};
 
     private Rectangle musicSlider, sfxSlider;
     private Rectangle musicTrack, sfxTrack;
-    private Rectangle[] diffBtns = new Rectangle[3];
     private Rectangle fullBtn;
     private Rectangle backRect;
     private Rectangle applyRect;
@@ -30,7 +26,7 @@ public class SettingsScreen extends JPanel {
     private String dragging = null; // "music" or "sfx"
     private boolean backHovered  = false;
     private boolean applyHovered = false;
-    private int hoveredDiff = -1;
+    
 
     public SettingsScreen(GameWindow window) {
         this.window = window;
@@ -43,13 +39,17 @@ public class SettingsScreen extends JPanel {
             @Override
             public void mouseMoved(MouseEvent e) {
                 boolean prevB = backHovered, prevA = applyHovered;
+
                 backHovered  = backRect  != null && backRect.contains(e.getPoint());
                 applyHovered = applyRect != null && applyRect.contains(e.getPoint());
-                int prevD = hoveredDiff; hoveredDiff = -1;
-                for (int i = 0; i < diffBtns.length; i++)
-                    if (diffBtns[i] != null && diffBtns[i].contains(e.getPoint())) hoveredDiff = i;
-                if (prevB != backHovered || prevA != applyHovered || prevD != hoveredDiff) repaint();
-                boolean anyHover = backHovered || applyHovered || hoveredDiff >= 0;
+
+                if (prevB != backHovered || prevA != applyHovered) repaint();
+
+                boolean anyHover = backHovered || applyHovered ||
+                        (musicSlider != null && musicSlider.contains(e.getPoint())) ||
+                        (sfxSlider != null && sfxSlider.contains(e.getPoint())) ||
+                        (fullBtn != null && fullBtn.contains(e.getPoint()));
+
                 setCursor(anyHover ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
             }
 
@@ -58,10 +58,13 @@ public class SettingsScreen extends JPanel {
                 if ("music".equals(dragging) && musicTrack != null) {
                     int val = (int)(100.0 * (e.getX() - musicTrack.x) / musicTrack.width);
                     musicVol = Math.max(0, Math.min(100, val));
+                    SoundManager.setMusicVolume(musicVol / 100f);
                     repaint();
+
                 } else if ("sfx".equals(dragging) && sfxTrack != null) {
                     int val = (int)(100.0 * (e.getX() - sfxTrack.x) / sfxTrack.width);
                     sfxVol = Math.max(0, Math.min(100, val));
+                    SoundManager.setSfxVolume(sfxVol / 100f);
                     repaint();
                 }
             }
@@ -79,13 +82,23 @@ public class SettingsScreen extends JPanel {
 
             @Override
             public void mouseClicked(MouseEvent e) {
-                for (int i = 0; i < diffBtns.length; i++)
-                    if (diffBtns[i] != null && diffBtns[i].contains(e.getPoint())) { difficulty = i; repaint(); return; }
-                if (fullBtn != null && fullBtn.contains(e.getPoint())) { fullscreen = !fullscreen; repaint(); return; }
-                if (backRect  != null && backRect.contains(e.getPoint()))  window.showMainMenu();
+                if (fullBtn != null && fullBtn.contains(e.getPoint())) {
+                    fullscreen = !fullscreen;
+                    window.setFullscreen(fullscreen);
+                    repaint();
+                    return;
+                }
+
+                if (backRect != null && backRect.contains(e.getPoint())) {
+                    window.showMainMenu();
+                    return;
+                }
+
                 if (applyRect != null && applyRect.contains(e.getPoint())) {
-                    JOptionPane.showMessageDialog(SettingsScreen.this,
-                        "Settings applied!", "Settings", JOptionPane.INFORMATION_MESSAGE);
+                    SoundManager.setMusicVolume(musicVol / 100f);
+                    SoundManager.setSfxVolume(sfxVol / 100f);
+
+                    window.showMainMenu(); 
                 }
             }
         });
@@ -152,30 +165,6 @@ public class SettingsScreen extends JPanel {
         ry = drawSliderRow(g2, "SFX VOLUME", sfxVol, rowX, ry, rowW, false);
         sfxTrack = new Rectangle(rowX + 160, ry - 32, rowW - 160, 16);
         sfxSlider = new Rectangle((int)(sfxTrack.x + sfxTrack.width * sfxVol / 100.0) - 8, ry - 40, 16, 32);
-
-        // Difficulty
-        ry += 20;
-        drawLabel(g2, "DIFFICULTY", rowX, ry);
-        int dbW = 110, dbH = 36, dbGap = 12;
-        int dbStartX = rowX + 160;
-        for (int i = 0; i < 3; i++) {
-            int dx = dbStartX + i * (dbW + dbGap);
-            diffBtns[i] = new Rectangle(dx, ry - 26, dbW, dbH);
-            boolean sel = difficulty == i;
-            boolean hov = hoveredDiff == i;
-            g2.setColor(sel ? new Color(80,45,10,220) : hov ? new Color(40,20,8,200) : new Color(20,10,5,180));
-            g2.fillRect(dx, ry-26, dbW, dbH);
-            g2.setColor(sel ? GOLD_LIGHT : hov ? GOLD : GOLD_DARK);
-            g2.setStroke(new BasicStroke(sel ? 2f : 1f));
-            g2.drawRect(dx, ry-26, dbW, dbH);
-            Font df = new Font("Serif", Font.BOLD, 14);
-            g2.setFont(df);
-            FontMetrics dfm = g2.getFontMetrics();
-            String dl = DIFF_LABELS[i];
-            g2.setColor(sel ? GOLD_LIGHT : GOLD);
-            g2.drawString(dl, dx + (dbW - dfm.stringWidth(dl))/2, ry - 26 + (dbH + dfm.getAscent() - dfm.getDescent())/2);
-        }
-        ry += 50;
 
         // Fullscreen toggle
         drawLabel(g2, "FULLSCREEN", rowX, ry);

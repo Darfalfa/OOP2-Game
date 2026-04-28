@@ -273,6 +273,7 @@ abstract public class Character {
         turnCounter = 0;
     }
 
+    public abstract String getSkillSfx(int skillNumber);
     public abstract String getSkillDamageRange(int skillNumber);
     public abstract String getBackgroundInfo();
     public abstract int useSkill(int skillNumber, Character enemy);

@@ -10,6 +10,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
+import javax.sound.sampled.*;
 import javax.swing.*;
 
 /**
@@ -353,16 +354,35 @@ public class BattleScreen extends JPanel {
     }
 
     // ── Player actions ────────────────────────────────────────────────────────
-    private void doSkill(int skillNumber, Color fxColor) {
+    private void playSfx(String fileName) {
+        try {
+            File soundFile = new File("sounds/" + fileName);
+            AudioInputStream audio = AudioSystem.getAudioInputStream(soundFile);
+
+            Clip clip = AudioSystem.getClip();
+            clip.open(audio);
+            clip.start();
+
+        } catch (Exception e) {
+            System.err.println("Error playing sound: " + fileName);
+            e.printStackTrace();
+        }
+    }
+
+    public void doSkill(int skillNumber, Color fxColor) {
         if (!playerCharacter.isSkillAvailable(skillNumber)) {
             addLog("Skill on cooldown! " + playerCharacter.getSkillCooldown(skillNumber) + " turns left.");
             return;
         }
 
+        String sfx = playerCharacter.getSkillSfx(skillNumber);
+        if (sfx != null) {
+            SoundManager.playSfx(sfx);
+        }
+
         int dmg = playerCharacter.useSkill(skillNumber, enemyCharacter);
 
         addLog(playerCharacter.getName() + " used " + playerCharacter.getSkillName(skillNumber) + "!");
-
         addLog("Dealt " + dmg + " damage!");
 
         triggerShake(true);
@@ -454,6 +474,11 @@ public class BattleScreen extends JPanel {
     private void enemyTurn() {
         int skillNum = chooseAvailableEnemySkill();
 
+        String sfx = enemyCharacter.getSkillSfx(skillNum);
+        if (sfx != null) {
+            SoundManager.playSfx(sfx);
+        }
+
         int dealt = enemyCharacter.useSkill(skillNum, playerCharacter);
 
         addLog(enemyCharacter.getName() + " used " + enemyCharacter.getSkillName(skillNum) + "!");
@@ -490,11 +515,15 @@ public class BattleScreen extends JPanel {
 
             isHealingPhase = true; 
 
-            String healMsg = playerCharacter.handleAutoHeal();
+            if (playerCharacter.getLevel() >= 4) {
 
-            if (healMsg != null) {
-                addLog(healMsg);
-                showWensHealEffect();
+                String healMsg = playerCharacter.handleAutoHeal();
+
+                if (healMsg != null) {
+                    addLog(healMsg);
+                    showWensHealEffect();
+                }
+
             }
 
             // Wait for Wens animation before unlocking
@@ -1005,6 +1034,7 @@ public class BattleScreen extends JPanel {
 
     //Companion
     private void showWensHealEffect() {
+        SoundManager.playSfx("Wens_heal.wav");
         wensFadeTicks = WENS_FADE_MAX;
     }
 

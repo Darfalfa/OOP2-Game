@@ -58,6 +58,16 @@ public class AyaLogic extends Character {
     }
 
     @Override
+    public String getSkillSfx(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> "Aya_ChasingArrow.wav";
+            case 2 -> "Aya_MetalRain.wav";
+            case 3 -> "Aya_SagittariusPunishment.wav";
+            default -> null;
+        };
+    }
+
+    @Override
     public String getSkillDamageRange(int skillNumber) {
         double multiplier = (1 + 0.07 * (getLevel() - 1));
 
@@ -78,5 +88,4 @@ public class AyaLogic extends Character {
                 return "0";
         }
     }
-
 }
