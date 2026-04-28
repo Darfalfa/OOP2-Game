@@ -1,7 +1,6 @@
-import Characters.AyaLogic;
+import Characters.*;
 import Characters.Character;
-import Characters.JakaraLogic;
-import Characters.RonnixLogic;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
@@ -83,8 +82,18 @@ public class BattleScreen extends JPanel {
     private float displayPlayerHp = 0;
     private float displayEnemyHp = 0;
 
-    // Sprites
-    private BufferedImage enemySprite;
+    // Enemy sprite
+    private BufferedImage enemySpriteSheet;
+
+    private int enemyFrame = 0;
+
+    private int enemyFrameTick = 0;
+    private int enemyFrameSpeed = 6;
+
+    private int enemyMaxFrames = 1;
+
+    private int frameWidth;
+    private int frameHeight;
 
     // Per-character battle sprites (loaded once, swapped on character change)
     private BufferedImage ayaBattleSprite;
@@ -140,6 +149,17 @@ public class BattleScreen extends JPanel {
         setupListeners();
 
         animTimer = new Timer(16, e -> {
+            enemyFrameTick++;
+
+            if (enemyFrameTick >= enemyFrameSpeed) {
+
+                enemyFrameTick = 0;
+
+                enemyFrame =
+                        (enemyFrame + 1) % enemyMaxFrames;
+
+            }
+
             animTick++;
             if (wensFadeTicks > 0) {
                 wensFadeTicks--;
@@ -187,7 +207,6 @@ public class BattleScreen extends JPanel {
      * Each character has a dedicated "fighting stance" image stored in images/.
      */
     private void loadAllSprites() {
-        enemySprite       = tryLoadImage("images/enemy_shadow.png");
         ayaBattleSprite    = tryLoadImage("images/aya/ayaBattle.png");
         ronnixBattleSprite = tryLoadImage("images/ronnix/ronnixBattle.png");
         jakaraBattleSprite = tryLoadImage("images/jakara/jakaraBattle.png");
@@ -275,6 +294,22 @@ public class BattleScreen extends JPanel {
     public void startBattle(Character player, Character enemy, Runnable onEnd) {
         this.playerCharacter = player;
         this.enemyCharacter = enemy;
+
+        this.enemyCharacter = EnemyFactory.createEnemyForLevel(player.getLevel());
+
+        enemySpriteSheet =
+                tryLoadImage(enemyCharacter.getSpritePath());
+
+        frameWidth  = enemyCharacter.getFrameWidth();
+        frameHeight = enemyCharacter.getFrameHeight();
+
+        if (enemySpriteSheet != null) {
+
+            enemyMaxFrames =
+                    enemySpriteSheet.getWidth() / frameWidth;
+
+            enemyFrame = 0;
+        }
 
         this.enemyCharacter.setLevel(playerCharacter.getLevel());
         this.enemyCharacter.restoreStats();
@@ -612,9 +647,7 @@ public class BattleScreen extends JPanel {
         drawBackground(g2, W, H);
         drawEnemyArea(g2, W, H);
         drawPlayerArea(g2, W, H);
-        drawPlayerArea(g2, W, H);
         drawWensEffect(g2, W, H);
-        drawHpBars(g2, W, H);
         drawHpBars(g2, W, H);
         drawTurnTimer(g2, W, H);
         drawActionButtons(g2, W, H);
@@ -674,21 +707,19 @@ public class BattleScreen extends JPanel {
 
         int offX = (enemyShake && shakeTicks > 0) ? (int)shakeX : 0;
 
-        if (enemySprite != null) {
-            g2.drawImage(enemySprite, ex + offX, ey, eW, eH, null);
-        } else {
-            // Fallback drawn enemy
-            g2.setColor(new Color(20, 10, 40, 230));
-            g2.fillOval(ex + offX, ey, eW, eH);
-            g2.setColor(new Color(100, 60, 180, 200));
-            g2.setStroke(new BasicStroke(3f));
-            g2.drawOval(ex + offX, ey, eW, eH);
-            g2.setColor(new Color(255, 255, 255, 220));
-            g2.fillOval(ex + offX + 28, ey + 40, 24, 24);
-            g2.fillOval(ex + offX + 80, ey + 40, 24, 24);
-            g2.setColor(PURPLE);
-            g2.fillOval(ex + offX + 34, ey + 46, 12, 12);
-            g2.fillOval(ex + offX + 86, ey + 46, 12, 12);
+        if (enemySpriteSheet != null) {
+
+            int sx = enemyFrame * frameWidth;
+
+            g2.drawImage(
+                    enemySpriteSheet,
+                    ex + offX, ey,
+                    ex + offX + eW, ey + eH,
+                    sx, 0,
+                    sx + frameWidth, frameHeight,
+                    null
+            );
+
         }
 
         // Enemy name tag

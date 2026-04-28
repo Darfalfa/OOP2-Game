@@ -2,9 +2,11 @@ package Characters;
 
 public class ShadowLogic extends Character {
 
-    public ShadowLogic() {
-        super("Shadow Dweller", 90, 8, 35, 1);
+    public ShadowLogic(int playerLevel) {
+        super("Shadow Dweller", 90, 8, 35, playerLevel);
     }
+
+
 
     @Override
     public String getBackgroundInfo(){
@@ -48,13 +50,6 @@ public class ShadowLogic extends Character {
         return random.nextInt(35 - 10 + 1) + 10;
     }
 
-    public void displaySkills() {
-        System.out.println(getName() + "'s Skills:");
-        System.out.println("1. Shadow Assassination | Damage: 7-13");
-        System.out.println("2. Shadow Severing | Damage: 17-22");
-        System.out.println("3. Absolute Darkness | Damage: 28-34 + 2");
-    }
-
     @Override
     public String getSkillName(int skillNumber) {
         switch (skillNumber) {
@@ -96,5 +91,36 @@ public class ShadowLogic extends Character {
             default:
                 return "0";
         }
+    }
+
+    @Override
+    public String getSpritePath() {
+
+        if (getLevel() == 2) {
+            return "images/ShadowSpriteLv2.png";
+        }
+
+        return "images/ShadowSprite.png";
+    }
+
+    @Override
+    public int getFrameWidth() {
+        if (getLevel() == 2) {
+            return 288; // Level 2 frame width
+        }
+        return 210; // Level 1 frame width
+    }
+
+    @Override
+    public int getFrameHeight() {
+        if (getLevel() == 2) {
+            return 321; // Level 2 frame width
+        }
+        return 203; // Level 1 frame width
+    }
+
+    @Override
+    public int getMaxFrames() {
+        return 12; // Both levels use 12 frames
     }
 }

@@ -37,6 +37,7 @@ public class GameScreen extends JPanel implements Runnable {
     // enemies
     private final List<Enemy> enemies = new ArrayList<>();
     private static final int ENEMY_COUNT = 10;
+    private int lastPlayerLevel = -1;
 
     private Character playerCharacter;
 
@@ -50,6 +51,8 @@ public class GameScreen extends JPanel implements Runnable {
 
     private Rectangle menuBtnRect;
     private boolean menuBtnHovered = false;
+
+    private Rectangle nextLevelBtn;
 
     private boolean infoOpen = false;
 
@@ -192,24 +195,41 @@ public class GameScreen extends JPanel implements Runnable {
             @Override
             public void mouseClicked(MouseEvent e) {
             Point p = e.getPoint();
-    if (wensDialogueOpen) {
-        wensDialogueOpen = false;
-        return;
-    }
-    if (khaiDialogueOpen) {
-        khaiDialogueOpen = false;
-        return;
-    }
+            if (wensDialogueOpen) {
+                wensDialogueOpen = false;
+                return;
+            }
 
-    if (menuBtnRect != null && menuBtnRect.contains(e.getPoint())) {
-        stopGame();
-        window.showMainMenu();
-    }
+            if (khaiDialogueOpen) {
+                khaiDialogueOpen = false;
+                return;
+            }
+
+            if (menuBtnRect != null && menuBtnRect.contains(e.getPoint())) {
+                stopGame();
+                window.showMainMenu();
+            }
+
+            if (nextLevelBtn != null && nextLevelBtn.contains(p)) {
+
+                if (playerCharacter != null) {
+
+                    int needed = playerCharacter.getNextLevelXp();
+                    int current = playerCharacter.getCurrentXp();
+
+                    int give = needed - current + 1;
+
+                    playerCharacter.gainXp(give);
+                }
+
+                repaint();
+                return;
+            }
 
                 // ── Dialogue clicks ───────────────────────────────────────────
                 if (shopDialogueOpen) {
                     if (dialogueShopBtn != null && dialogueShopBtn.contains(p)) {
-                        SoundManager.stopSfx(); 
+                        SoundManager.stopSfx();
                         shopDialogueOpen = false;
                         shopOpen = true;
                         dialogueHovered = -1;
@@ -217,7 +237,7 @@ public class GameScreen extends JPanel implements Runnable {
                         return;
                     }
                     if (dialogueCloseBtn != null && dialogueCloseBtn.contains(p)) {
-                        SoundManager.stopSfx(); 
+                        SoundManager.stopSfx();
                         shopDialogueOpen = false;
                         dialogueHovered = -1;
                         repaint();
@@ -226,50 +246,49 @@ public class GameScreen extends JPanel implements Runnable {
                 }
 
                 if (shopOpen) {
+                    // BUY HEALTH
+                    if (buyHealthBtn != null && buyHealthBtn.contains(p)) {
+                        if (playerCharacter.getGold() >= HEALTH_PRICE) {
+                            playerCharacter.addGold(-HEALTH_PRICE);
+                            playerCharacter.setHealthPotion(playerCharacter.getHealthPotion() + 1);
+                            showShopFeedback("Health Potion purchased!");
+                        } else {
+                            showShopFeedback("Not enough coins!");
+                        }
+                    }
 
-// BUY HEALTH
-if (buyHealthBtn != null && buyHealthBtn.contains(p)) {
-    if (playerCharacter.getGold() >= HEALTH_PRICE) {
-        playerCharacter.addGold(-HEALTH_PRICE);
-        playerCharacter.setHealthPotion(playerCharacter.getHealthPotion() + 1);
-        showShopFeedback("Health Potion purchased!");
-    } else {
-        showShopFeedback("Not enough coins!");
-    }
-}
+                    // SELL HEALTH
+                    if (sellHealthBtn != null && sellHealthBtn.contains(p)) {
+                        if (playerCharacter.getHealthPotion() > 0) {
+                            playerCharacter.setHealthPotion(playerCharacter.getHealthPotion() - 1);
+                            playerCharacter.addGold(HEALTH_PRICE);
+                            showShopFeedback("Health Potion sold!");
+                        } else {
+                            showShopFeedback("No potions to sell!");
+                        }
+                    }
 
-// SELL HEALTH
-if (sellHealthBtn != null && sellHealthBtn.contains(p)) {
-    if (playerCharacter.getHealthPotion() > 0) {
-        playerCharacter.setHealthPotion(playerCharacter.getHealthPotion() - 1);
-        playerCharacter.addGold(HEALTH_PRICE);
-        showShopFeedback("Health Potion sold!");
-    } else {
-        showShopFeedback("No potions to sell!");
-    }
-}
+                    // BUY EXP
+                    if (buyExpBtn != null && buyExpBtn.contains(p)) {
+                        if (playerCharacter.getGold() >= EXP_PRICE) {
+                            playerCharacter.addGold(-EXP_PRICE);
+                            playerCharacter.setExpPotion(playerCharacter.getExpPotion() + 1);
+                            showShopFeedback("EXP Potion purchased!");
+                        } else {
+                            showShopFeedback("Not enough coins!");
+                        }
+                    }
 
-// BUY EXP
-if (buyExpBtn != null && buyExpBtn.contains(p)) {
-    if (playerCharacter.getGold() >= EXP_PRICE) {
-        playerCharacter.addGold(-EXP_PRICE);
-        playerCharacter.setExpPotion(playerCharacter.getExpPotion() + 1);
-        showShopFeedback("EXP Potion purchased!");
-    } else {
-        showShopFeedback("Not enough coins!");
-    }
-}
-
-// SELL EXP
-if (sellExpBtn != null && sellExpBtn.contains(p)) {
-    if (playerCharacter.getExpPotion() > 0) {
-        playerCharacter.setExpPotion(playerCharacter.getExpPotion() - 1);
-        playerCharacter.addGold(EXP_PRICE);
-        showShopFeedback("EXP Potion sold!");
-    } else {
-        showShopFeedback("No potions to sell!");
-    }
-}
+                    // SELL EXP
+                    if (sellExpBtn != null && sellExpBtn.contains(p)) {
+                        if (playerCharacter.getExpPotion() > 0) {
+                            playerCharacter.setExpPotion(playerCharacter.getExpPotion() - 1);
+                            playerCharacter.addGold(EXP_PRICE);
+                            showShopFeedback("EXP Potion sold!");
+                        } else {
+                            showShopFeedback("No potions to sell!");
+                        }
+                    }
 
                     // EXIT
                     if (exitBtn != null && exitBtn.contains(p)) {
@@ -374,33 +393,33 @@ if (sellExpBtn != null && sellExpBtn.contains(p)) {
                 ey = 200 + (int)(Math.random() * (worldHeight - 400));
             } while (Math.hypot(ex - player.x, ey - player.y) < 300);
 
-            enemies.add(new Enemy(ex, ey, new ShadowLogic()));
+            Character enemyChar = EnemyFactory.createEnemyForLevel(playerCharacter.getLevel());
+            enemies.add(new Enemy(ex, ey, enemyChar, this));
         }
     }
 
-public void onBattleEnd(Enemy defeated, boolean won) {
-        inBattle = false;
-        postBattleCooldown = 120; // about 2 seconds
+    public void onBattleEnd(Enemy defeated, boolean won) {
+            inBattle = false;
+            postBattleCooldown = 120; // about 2 seconds
 
-        // Reset all held keys so the player doesn't auto-walk after returning
-        keyH.upPressed    = false;
-        keyH.downPressed  = false;
-        keyH.leftPressed  = false;
-        keyH.rightPressed = false;
+            // Reset all held keys so the player doesn't auto-walk after returning
+            keyH.upPressed    = false;
+            keyH.downPressed  = false;
+            keyH.leftPressed  = false;
+            keyH.rightPressed = false;
 
-        if (won) {
-    defeated.defeated = true;
-    defeated.respawnTimer = 300; // ~5 seconds
+            if (won) {
+            defeated.defeated = true;
+            defeated.respawnTimer = 300; // ~5 seconds
 
-    if (!wensDialogueSeen && playerCharacter != null && playerCharacter.getLevel() >= 4) {
-        wensDialogueOpen = true;
-        wensDialogueSeen = true;
+            if (!wensDialogueSeen && playerCharacter != null && playerCharacter.getLevel() >= 4) {
+                wensDialogueOpen = true;
+                wensDialogueSeen = true;
+            }
+    } else {
+        // Push player away a bit after losing so battle doesn't instantly retrigger
+                safePlayerRespawn();
     }
-} else {
-    // Push player away a bit after losing so battle doesn't instantly retrigger
-    player.x = Math.max(0, player.x - 100);
-    player.y = Math.max(0, player.y - 100);
-}
 
         SwingUtilities.invokeLater(() -> {
             window.showGameScreen();
@@ -438,11 +457,28 @@ public void onBattleEnd(Enemy defeated, boolean won) {
         }
     }
 
+    private void safePlayerRespawn() {
+        int tries = 0;
+
+        do {
+            player.x = (int)(Math.random() * worldWidth);
+            player.y = (int)(Math.random() * worldHeight);
+            tries++;
+        } while (isTileCollision(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H) && tries < 50);
+    }
+
     private void update() {
         if (inBattle) return;
 
         if (postBattleCooldown > 0) {
             postBattleCooldown--;
+        }
+
+        if (playerCharacter != null &&
+                playerCharacter.getLevel() != lastPlayerLevel) {
+
+            lastPlayerLevel = playerCharacter.getLevel();
+            spawnEnemies();
         }
 
         player.update();
@@ -473,7 +509,7 @@ public void onBattleEnd(Enemy defeated, boolean won) {
             }
 
             // ===== NORMAL BEHAVIOR =====
-            enemy.update(worldWidth, worldHeight);
+            enemy.update();
 
             if (postBattleCooldown == 0 &&
                     enemy.isNearPlayer(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H)) {
@@ -1305,6 +1341,24 @@ int w = 600;
         g2.drawString(lbl, tx + 2, ty + 2);
         g2.setColor(menuBtnHovered ? GOLD_LIGHT : GOLD);
         g2.drawString(lbl, tx, ty);
+
+        int nlW = 140;
+        int nlH = 30;
+        int nlX = getWidth() - nlW - 20;
+        int nlY = getHeight() - 100;
+
+        nextLevelBtn = new Rectangle(nlX, nlY, nlW, nlH);
+
+        boolean hover = hoveredBtn != null && hoveredBtn.equals(nextLevelBtn);
+
+        g2.setColor(hover ? new Color(255, 210, 90) : new Color(90, 60, 20));
+        g2.fillRoundRect(nlX, nlY, nlW, nlH, 10, 10);
+
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(nlX, nlY, nlW, nlH, 10, 10);
+
+        g2.setFont(new Font("Arial", Font.BOLD, 12));
+        g2.drawString("DEBUG: NEXT LEVEL", nlX + 10, nlY + 20);
 
         int baseY = getHeight() - 120;
 

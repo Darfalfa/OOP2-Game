@@ -30,12 +30,12 @@ public class JakaraLogic extends Character {
 
             case 2:
                 dmg = (int)((random.nextInt(25 - 19 + 1) + 19) * (1 + 0.07 * (getLevel() - 1)));
-                setSkillCooldown(2, 3);
+                setSkillCooldown(2, 2);
                 break;
 
             case 3:
                 dmg = (int)(((random.nextInt(40 - 32 + 1) + 32) * (1 + 0.07 * (getLevel() - 1))) + (4 * (1 + 0.07 * (getLevel() - 1))));
-                setSkillCooldown(3, 5);
+                setSkillCooldown(3, 4);
                 break;
 
             default:

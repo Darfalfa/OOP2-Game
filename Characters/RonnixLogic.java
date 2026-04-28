@@ -31,12 +31,12 @@ public class RonnixLogic extends Character {
 
             case 2:
                 dmg = (int)((random.nextInt(24 - 18 + 1) + 18) * (1 + 0.07 * (getLevel() - 1)));
-                setSkillCooldown(2, 3);
+                setSkillCooldown(2, 2);
                 break;
 
             case 3:
                 dmg = (int)(((random.nextInt(38 - 30 + 1) + 30) * (1 + 0.07 * (getLevel() - 1))) + (3 * (1 + 0.07 * (getLevel() - 1))));
-                setSkillCooldown(3, 5);
+                setSkillCooldown(3, 4);
                 break;
 
             default:
