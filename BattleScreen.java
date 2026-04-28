@@ -201,20 +201,8 @@ public class BattleScreen extends JPanel {
 
     public void setSelectedCharacter(String name) {
         this.selectedCharacter = name;
-        switch (name.toLowerCase()) {
-            case "ronnix":
-                playerCharacter = new RonnixLogic();
-                break;
-            case "aya":
-                playerCharacter = new AyaLogic();
-                break;
-            case "jakara":
-                playerCharacter = new JakaraLogic();
-                break;
-            default:
-                playerCharacter = new AyaLogic(); // fallback
-                break;
-        }
+        // Do NOT create a new playerCharacter here — the real one is passed in via startBattle().
+        // This method only stores the name so the correct battle sprite is displayed.
         repaint();
     }
 
@@ -260,6 +248,15 @@ public class BattleScreen extends JPanel {
     }
 
     public void startBattle(Character player, Character enemy, Runnable onEnd) {
+        // Stop any previously running timers before starting fresh
+        stopBattle();
+        stopIdleTimer();
+
+        this.usedPotionThisTurn = false;
+        this.hoveredBtn = -1;
+        this.shakeTicks = 0;
+        this.flashTicks = 0;
+
         this.playerCharacter = player;
         this.enemyCharacter = enemy;
 
@@ -422,7 +419,8 @@ public class BattleScreen extends JPanel {
 
             phase = Phase.VICTORY;
             playerWon = true;
-            scheduleEndScreen(6000);
+            stopIdleTimer();
+            repaint();
             return;
         }
 

@@ -28,14 +28,14 @@ public class Jakara extends Player {
     protected void loadSprites() {
 
         // ── Standing — all 8 directions ───────────────────────────────────────────
-        standingForward           = loadDirect(DIR + "standingForward.png");
-        standingBackward          = loadDirect(DIR + "standingBackward.png");
-        standingLeft              = loadDirect(DIR + "standingLeft.png");
-        standingRight             = loadDirect(DIR + "standingRight.png");
-        standingDiagonalUpLeft    = loadDirect(DIR + "standingDiagonalUpLeft.png");
-        standingDiagonalUpRight   = loadDirect(DIR + "standingDiagonalUpRight.png");
-        standingDiagonalDownLeft  = loadDirect(DIR + "standingDiagonalDownLeft.png");
-        standingDiagonalDownRight = loadDirect(DIR + "standingDiagonalDownRight.png");
+        standingForward           = loadDirect(DIR + "standingForward_Jakara.png");
+        standingBackward          = loadDirect(DIR + "standingBackward_Jakara.png");
+        standingLeft              = loadDirect(DIR + "standingLeft_Jakara.png");
+        standingRight             = loadDirect(DIR + "standingRight_Jakara1.png");
+        standingDiagonalUpLeft    = loadDirect(DIR + "standingDiagonalUpLeft_Jakara.png");
+        standingDiagonalUpRight   = loadDirect(DIR + "standingDiagonalUpRight_Jakara.png");
+        standingDiagonalDownLeft  = loadDirect(DIR + "standingDiagonalDownLeft_Jakara.png");
+        standingDiagonalDownRight = loadDirect(DIR + "standingDiagonalDownRight_Jakara.png");
 
         // ── Walking forward — 28 frames (sliced from 4-col × 7-row black-bg sheet) ─
         walkingForwardFrames = new BufferedImage[28];
