@@ -1,3 +1,7 @@
+import Characters.AyaLogic;
+import Characters.Character;
+import Characters.JakaraLogic;
+import Characters.RonnixLogic;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
@@ -36,13 +40,14 @@ public class CharacterSelectScreen extends JPanel {
     private boolean   backHovered = false;
 
     // Character stat bars (HP, MP, ATK, DEF) out of 10
-    private static final String[] CHAR_NAMES = { "AYA", "RONNIX", "JAKARA" };
-    private static final String[] CHAR_CLASS = { "Ranger", "Fighter", "Arcane Mage" };
-    private static final int[][] CHAR_STATS  = {
-        { 7, 8, 6, 5 },   // Aya
-        { 9, 4, 9, 8 },   // Ronnix
-        { 5, 10, 9, 3 }   // Jakara
+    private static final Character[] CHARACTERS = {
+        new AyaLogic(),
+        new RonnixLogic(),
+        new JakaraLogic()
     };
+
+    private static final String[] CHAR_NAMES = { "AYA", "RONNIX", "JAKARA" };
+    private static final String[] CHAR_CLASS = { "Archer", "Fighter", "Arcane Mage" };
 
     public CharacterSelectScreen(GameWindow window) {
         this.window = window;
@@ -228,34 +233,37 @@ public class CharacterSelectScreen extends JPanel {
         drawCenteredInRect(g2, CHAR_CLASS[idx], x, w, y + portraitAreaH + 44);
 
         // Stat bars
-        String[] statLabels = { "HP", "MP", "ATK", "DEF" };
-        int[] stats = CHAR_STATS[idx];
+        String[] statLabels = { "HP", "DEF", "SK1", "SK2", "SK3" };
+
+        Character c = CHARACTERS[idx];
+
+        String[] statValues = {
+            String.valueOf(c.getMaxHp()),
+            String.valueOf(c.getMaxDefense()),
+            c.getSkillDamageRange(1),
+            c.getSkillDamageRange(2),
+            c.getSkillDamageRange(3)
+        };
+        
         int barAreaY = y + portraitAreaH + 58;
         int barW = w - 30, barH = 9, barX = x + 15;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < statLabels.length; i++) {
             int by = barAreaY + i * 20;
+
             g2.setFont(new Font("Monospaced", Font.BOLD, 10));
             g2.setColor(new Color(180, 160, 120));
-            g2.drawString(statLabels[i], barX, by + barH - 1);
-            int tX = barX + 32;
-            int tW = barW - 32;
-            g2.setColor(new Color(15, 8, 20));
-            g2.fillRoundRect(tX, by, tW, barH, barH, barH);
-            int fillW = (int)(tW * stats[i] / 10.0);
-            Color fillCol = isRonnix  ? lerp(STEEL_DARK, STEEL_LIGHT, stats[i] / 10f)
-                          : isJakara  ? lerp(MAGE_DARK,  MAGE_LIGHT,  stats[i] / 10f)
-                                      : lerp(GOLD_DARK,  GOLD_LIGHT,  stats[i] / 10f);
-            g2.setColor(fillCol);
-            if (fillW > 0) g2.fillRoundRect(tX, by, fillW, barH, barH, barH);
-            g2.setColor(accent.darker()); g2.setStroke(new BasicStroke(0.8f));
-            g2.drawRoundRect(tX, by, tW, barH, barH, barH);
+            g2.drawString(statLabels[i], barX, by + barH);
+
+            int valueX = barX + 45;
+
+            g2.setColor(accent);
+            g2.drawString(statValues[i], valueX, by + barH);
         }
 
-        // Prompt
-        g2.setFont(new Font("Serif", Font.ITALIC, 12));
-        g2.setColor(hovered ? accent : new Color(120, 100, 60));
-        drawCenteredInRect(g2, "Click to select", x, w, y + h - 10);
-    }
+                g2.setFont(new Font("Serif", Font.ITALIC, 12));
+                g2.setColor(hovered ? accent : new Color(120, 100, 60));
+                drawCenteredInRect(g2, "Click to select", x, w, y + h - 10);
+            }
 
     /**
      * Draws a stylised placeholder silhouette when no sprite image is found.

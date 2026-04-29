@@ -61,7 +61,9 @@ public class GameWindow extends JFrame {
         return selectedCharacter;
     }
     
-    public void showMainMenu()        { cardLayout.show(root, SCREEN_MAIN);      }
+    public void showMainMenu()        { 
+        SoundManager.playBgm("title.wav");
+        cardLayout.show(root, SCREEN_MAIN);      }
     public void showCharacterSelect() { cardLayout.show(root, SCREEN_CHARACTER); }
     public void showSettings()        { cardLayout.show(root, SCREEN_SETTINGS);  }
     public void showGameScreen()      { cardLayout.show(root, SCREEN_GAME);      }
@@ -74,6 +76,7 @@ public class GameWindow extends JFrame {
     public void showGame() {
         cardLayout.show(root, SCREEN_LOADING);
         loadingScreen.startLoading(() -> {
+            SoundManager.stopBgm();
             cardLayout.show(root, SCREEN_GAME);
             gameScreen.startGame();
         });
@@ -94,5 +97,20 @@ public class GameWindow extends JFrame {
                 gs.onBattleEnd(mapEnemy, won);
             }
         );
+    }
+
+    public void setFullscreen(boolean fullscreen) {
+        dispose();
+        setUndecorated(fullscreen);
+
+        if (fullscreen) {
+            setExtendedState(JFrame.MAXIMIZED_BOTH);
+        } else {
+            setExtendedState(JFrame.NORMAL);
+            setSize(WIDTH, HEIGHT);
+            setLocationRelativeTo(null);
+        }
+
+        setVisible(true);
     }
 }

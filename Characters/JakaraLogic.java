@@ -1,5 +1,4 @@
 package Characters;
-
 public class JakaraLogic extends Character {
 
     public JakaraLogic() {
@@ -31,12 +30,12 @@ public class JakaraLogic extends Character {
 
             case 2:
                 dmg = (int)((random.nextInt(25 - 19 + 1) + 19) * (1 + 0.07 * (getLevel() - 1)));
-                setSkillCooldown(2, 3);
+                setSkillCooldown(2, 2);
                 break;
 
             case 3:
                 dmg = (int)(((random.nextInt(40 - 32 + 1) + 32) * (1 + 0.07 * (getLevel() - 1))) + (4 * (1 + 0.07 * (getLevel() - 1))));
-                setSkillCooldown(3, 5);
+                setSkillCooldown(3, 4);
                 break;
 
             default:
@@ -55,6 +54,16 @@ public class JakaraLogic extends Character {
             case 3: return "Astral Supernova";
             default: return "Unknown Skill";
         }
+    }
+
+    @Override
+    public String getSkillSfx(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> "Jakara_EldritchBeam.wav";
+            case 2 -> "Jakara_ArgentRupture.wav";
+            case 3 -> "Jakara_AstralSupernova.wav";
+            default -> null;
+        };
     }
 
     @Override

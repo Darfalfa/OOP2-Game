@@ -1,7 +1,6 @@
-import Characters.AyaLogic;
+import Characters.*;
 import Characters.Character;
-import Characters.JakaraLogic;
-import Characters.RonnixLogic;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
@@ -10,6 +9,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
+import javax.sound.sampled.*;
 import javax.swing.*;
 
 /**
@@ -77,16 +77,33 @@ public class BattleScreen extends JPanel {
     private boolean enemyShake  = false;
     private boolean playerShake = false;
 
+    private boolean isHealingPhase = false;
+
     private float displayPlayerHp = 0;
     private float displayEnemyHp = 0;
 
-    // Sprites
-    private BufferedImage enemySprite;
+    // Enemy sprite
+    private BufferedImage enemySpriteSheet;
+
+    private int enemyFrame = 0;
+
+    private int enemyFrameTick = 0;
+    private int enemyFrameSpeed = 6;
+
+    private int enemyMaxFrames = 1;
+
+    private int frameWidth;
+    private int frameHeight;
 
     // Per-character battle sprites (loaded once, swapped on character change)
     private BufferedImage ayaBattleSprite;
     private BufferedImage ronnixBattleSprite;
     private BufferedImage jakaraBattleSprite;
+    private BufferedImage wensSprite;
+
+    //companion-battle
+    private int wensFadeTicks = 0;
+    private static final int WENS_FADE_MAX = 60;
 
     // Flash effect
     private int flashTicks = 0;
@@ -132,7 +149,22 @@ public class BattleScreen extends JPanel {
         setupListeners();
 
         animTimer = new Timer(16, e -> {
+            enemyFrameTick++;
+
+            if (enemyFrameTick >= enemyFrameSpeed) {
+
+                enemyFrameTick = 0;
+
+                enemyFrame =
+                        (enemyFrame + 1) % enemyMaxFrames;
+
+            }
+
             animTick++;
+            if (wensFadeTicks > 0) {
+                wensFadeTicks--;
+            }
+
             if (shakeTicks > 0) {
                 shakeTicks--;
                 shakeX = (shakeTicks % 2 == 0) ? 6 : -6;
@@ -175,10 +207,10 @@ public class BattleScreen extends JPanel {
      * Each character has a dedicated "fighting stance" image stored in images/.
      */
     private void loadAllSprites() {
-        enemySprite       = tryLoadImage("images/enemy_shadow.png");
         ayaBattleSprite    = tryLoadImage("images/aya/ayaBattle.png");
         ronnixBattleSprite = tryLoadImage("images/ronnix/ronnixBattle.png");
         jakaraBattleSprite = tryLoadImage("images/jakara/jakaraBattle.png");
+        wensSprite = tryLoadImage("images/Wens.png");
     }
 
     /** Returns the loaded BufferedImage, or null if the file is missing. */
@@ -260,8 +292,26 @@ public class BattleScreen extends JPanel {
         this.playerCharacter = player;
         this.enemyCharacter = enemy;
 
+        this.enemyCharacter = EnemyFactory.createEnemyForLevel(player.getLevel());
+
+        enemySpriteSheet =
+                tryLoadImage(enemyCharacter.getSpritePath());
+
+        frameWidth  = enemyCharacter.getFrameWidth();
+        frameHeight = enemyCharacter.getFrameHeight();
+
+        if (enemySpriteSheet != null) {
+
+            enemyMaxFrames =
+                    enemySpriteSheet.getWidth() / frameWidth;
+
+            enemyFrame = 0;
+        }
+
         this.enemyCharacter.setLevel(playerCharacter.getLevel());
         this.enemyCharacter.restoreStats();
+
+        playerCharacter.resetTurnCounter();
 
         this.onBattleEnd = onEnd;
         this.phase = Phase.PLAYER_TURN;
@@ -312,7 +362,7 @@ public class BattleScreen extends JPanel {
                     return;
                 }
 
-                if (phase != Phase.PLAYER_TURN) return;
+                if (phase != Phase.PLAYER_TURN || isHealingPhase) return;
 
                 stopIdleTimer();
 
@@ -336,16 +386,35 @@ public class BattleScreen extends JPanel {
     }
 
     // ── Player actions ────────────────────────────────────────────────────────
-    private void doSkill(int skillNumber, Color fxColor) {
+    private void playSfx(String fileName) {
+        try {
+            File soundFile = new File("sounds/" + fileName);
+            AudioInputStream audio = AudioSystem.getAudioInputStream(soundFile);
+
+            Clip clip = AudioSystem.getClip();
+            clip.open(audio);
+            clip.start();
+
+        } catch (Exception e) {
+            System.err.println("Error playing sound: " + fileName);
+            e.printStackTrace();
+        }
+    }
+
+    public void doSkill(int skillNumber, Color fxColor) {
         if (!playerCharacter.isSkillAvailable(skillNumber)) {
             addLog("Skill on cooldown! " + playerCharacter.getSkillCooldown(skillNumber) + " turns left.");
             return;
         }
 
+        String sfx = playerCharacter.getSkillSfx(skillNumber);
+        if (sfx != null) {
+            SoundManager.playSfx(sfx);
+        }
+
         int dmg = playerCharacter.useSkill(skillNumber, enemyCharacter);
 
         addLog(playerCharacter.getName() + " used " + playerCharacter.getSkillName(skillNumber) + "!");
-
         addLog("Dealt " + dmg + " damage!");
 
         triggerShake(true);
@@ -438,6 +507,11 @@ public class BattleScreen extends JPanel {
     private void enemyTurn() {
         int skillNum = chooseAvailableEnemySkill();
 
+        String sfx = enemyCharacter.getSkillSfx(skillNum);
+        if (sfx != null) {
+            SoundManager.playSfx(sfx);
+        }
+
         int dealt = enemyCharacter.useSkill(skillNum, playerCharacter);
 
         addLog(enemyCharacter.getName() + " used " + enemyCharacter.getSkillName(skillNum) + "!");
@@ -470,10 +544,41 @@ public class BattleScreen extends JPanel {
             return;
         }
 
-        phase = Phase.PLAYER_TURN;
-        addLog("Your turn — choose an action.");
-        startIdleTimer();
-        repaint();
+        Timer healDelay = new Timer(900, e -> {
+
+            isHealingPhase = true; 
+
+            if (playerCharacter.getLevel() >= 4) {
+
+                String healMsg = playerCharacter.handleAutoHeal();
+
+                if (healMsg != null) {
+                    addLog(healMsg);
+                    showWensHealEffect();
+                }
+
+            }
+
+            // Wait for Wens animation before unlocking
+            Timer unlock = new Timer(1200, ev -> {
+                isHealingPhase = false; 
+
+                phase = Phase.PLAYER_TURN;
+                addLog("Your turn — choose an action.");
+                startIdleTimer();
+                repaint();
+
+                ((Timer)ev.getSource()).stop();
+            });
+
+            unlock.setRepeats(false);
+            unlock.start();
+
+            ((Timer)e.getSource()).stop();
+        });
+
+        healDelay.setRepeats(false);
+        healDelay.start();
     }
 
     private int chooseAvailableEnemySkill() {
@@ -540,6 +645,7 @@ public class BattleScreen extends JPanel {
         drawBackground(g2, W, H);
         drawEnemyArea(g2, W, H);
         drawPlayerArea(g2, W, H);
+        drawWensEffect(g2, W, H);
         drawHpBars(g2, W, H);
         drawTurnTimer(g2, W, H);
         drawActionButtons(g2, W, H);
@@ -599,21 +705,19 @@ public class BattleScreen extends JPanel {
 
         int offX = (enemyShake && shakeTicks > 0) ? (int)shakeX : 0;
 
-        if (enemySprite != null) {
-            g2.drawImage(enemySprite, ex + offX, ey, eW, eH, null);
-        } else {
-            // Fallback drawn enemy
-            g2.setColor(new Color(20, 10, 40, 230));
-            g2.fillOval(ex + offX, ey, eW, eH);
-            g2.setColor(new Color(100, 60, 180, 200));
-            g2.setStroke(new BasicStroke(3f));
-            g2.drawOval(ex + offX, ey, eW, eH);
-            g2.setColor(new Color(255, 255, 255, 220));
-            g2.fillOval(ex + offX + 28, ey + 40, 24, 24);
-            g2.fillOval(ex + offX + 80, ey + 40, 24, 24);
-            g2.setColor(PURPLE);
-            g2.fillOval(ex + offX + 34, ey + 46, 12, 12);
-            g2.fillOval(ex + offX + 86, ey + 46, 12, 12);
+        if (enemySpriteSheet != null) {
+
+            int sx = enemyFrame * frameWidth;
+
+            g2.drawImage(
+                    enemySpriteSheet,
+                    ex + offX, ey,
+                    ex + offX + eW, ey + eH,
+                    sx, 0,
+                    sx + frameWidth, frameHeight,
+                    null
+            );
+
         }
 
         // Enemy name tag
@@ -860,7 +964,7 @@ public class BattleScreen extends JPanel {
         int startX = (W - totalW) / 2;
         int btnY   = H - 90;
 
-        boolean locked = (phase == Phase.ENEMY_TURN);
+        boolean locked = (phase == Phase.ENEMY_TURN || isHealingPhase);
         String[] ACTIONS = getActionLabels();
 
         for (int i = 0; i < ACTIONS.length; i++) {
@@ -882,12 +986,13 @@ public class BattleScreen extends JPanel {
 
     private void drawButton(Graphics2D g2, String label, int x, int y, int w, int h,
                              boolean hovered, boolean locked) {
-        Color bg     = locked  ? new Color(20, 10, 30, 160)
-                     : hovered ? new Color(70, 40, 10, 220)
-                               : new Color(25, 12, 35, 200);
-        Color border = locked  ? new Color(60, 40, 80)
-                     : hovered ? GOLD_LIGHT
-                               : GOLD_DARK;
+        Color bg     = locked  ? new Color(50, 50, 60, 180)   // gray
+             : hovered ? new Color(70, 40, 10, 220)
+                       : new Color(25, 12, 35, 200);
+
+        Color border = locked  ? new Color(120, 120, 130)     // light gray border
+                    : hovered ? GOLD_LIGHT
+                            : GOLD_DARK;
 
         if (hovered) {
             g2.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 30));
@@ -928,6 +1033,7 @@ public class BattleScreen extends JPanel {
         } else {
             int tx = x + (w - fm.stringWidth(label)) / 2;
             int ty = y + (h + fm.getAscent() - fm.getDescent()) / 2;
+            g2.setColor(locked ? new Color(180, 180, 180) : GOLD_LIGHT);
             g2.drawString(label, tx, ty);
         }
     }
@@ -953,6 +1059,59 @@ public class BattleScreen extends JPanel {
             g2.setColor(new Color(1f, 1f, 0.85f, alpha));
             g2.drawString(log.get(i), logX + 14, textY + i * lineH);
         }
+    }
+
+    //Companion
+    private void showWensHealEffect() {
+        SoundManager.playSfx("Wens_heal.wav");
+        wensFadeTicks = WENS_FADE_MAX;
+    }
+
+    private void drawWensEffect(Graphics2D g2, int W, int H) {
+        if (wensFadeTicks <= 0 || wensSprite == null) return;
+
+        int elapsed = WENS_FADE_MAX - wensFadeTicks;
+
+        int wensW = 500;
+        int wensH = 300;
+
+        int startX = -wensW;
+        int targetX = 40;
+
+        int slideDuration = 20;     // slide time
+        int visibleDuration = 10;   // stay fully visible
+
+        int x;
+        float alpha = 1f;
+
+        if (elapsed < slideDuration) {
+            //SLIDE PHASE
+            float progress = elapsed / (float) slideDuration;
+            x = startX + (int)((targetX - startX) * progress);
+            alpha = 1f; // no fade yet
+
+        } else if (elapsed < slideDuration + visibleDuration) {
+            // STAY PHASE
+            x = targetX;
+            alpha = 1f;
+
+        } else {
+            // FADE PHASE
+            x = targetX;
+
+            int fadeElapsed = elapsed - (slideDuration + visibleDuration);
+            int fadeDuration = WENS_FADE_MAX - (slideDuration + visibleDuration);
+
+            alpha = 1f - (fadeElapsed / (float) fadeDuration);
+        }
+
+        Composite old = g2.getComposite();
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.max(0, alpha)));
+
+        int y = (int)(H * 0.20);
+        g2.drawImage(wensSprite, x, y, wensW, wensH, null);
+
+        g2.setComposite(old);
     }
 
     // ── End overlay ───────────────────────────────────────────────────────────

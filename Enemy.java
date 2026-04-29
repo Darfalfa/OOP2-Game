@@ -10,10 +10,20 @@ import javax.imageio.ImageIO;
  */
 public class Enemy {
 
+    private GameScreen gp;
+
     public int x, y;
     public static final int W = 48, H = 48;
 
     public Character character;
+
+    private BufferedImage spriteSheet;
+
+    private int frame = 0;
+    private final int maxFrames = 12;
+
+    private int frameTick = 0;
+    private int frameSpeed = 6;
 
     // Simple roam AI
     private double vx = 0, vy = 0;
@@ -26,21 +36,18 @@ public class Enemy {
     public boolean defeated = false;
 
     public int respawnTimer = 0;
-    public int respawnDelay = 300; 
 
-    // Sprite (optional — will draw a fallback shape if null)
-    private BufferedImage sprite;
-
-    public Enemy(int x, int y, Character character) {
+    public Enemy(int x, int y, Character character, GameScreen gp) {
         this.x = x;
         this.y = y;
         this.character = character;
+        this.gp = gp;
         pickNewDirection();
 
         try {
-            sprite = ImageIO.read(new File("images/enemy_shadow.png"));
+            spriteSheet = ImageIO.read(new File(character.getSpritePath()));
         } catch (Exception e) {
-            sprite = null; // fallback to drawn shape
+            spriteSheet = null;
         }
     }
 
@@ -51,22 +58,39 @@ public class Enemy {
         vy = Math.sin(angle) * spd;
     }
 
-    public void update(int worldW, int worldH) {
+    public void update() {
         if (defeated) return;
 
-        x += (int) vx;
-        y += (int) vy;
+        int nextX = x + (int) vx;
+        int nextY = y + (int) vy;
 
-        // Bounce off world edges
-        if (x < 0)          { x = 0;          vx =  Math.abs(vx); }
-        if (y < 0)          { y = 0;           vy =  Math.abs(vy); }
-        if (x > worldW - W) { x = worldW - W; vx = -Math.abs(vx); }
-        if (y > worldH - H) { y = worldH - H; vy = -Math.abs(vy); }
+        // horizontal collision
+        if (!gp.isTileCollision(nextX, y, W, H)) {
+            x = nextX;
+        } else {
+            vx *= -1;
+            x -= (int) vx;
+        }
+
+        // vertical collision
+        if (!gp.isTileCollision(x, nextY, W, H)) {
+            y = nextY;
+        } else {
+            vy *= -1;
+            y -= (int) vy;
+        }
 
         // Periodically pick a new random direction
         if (++roamTimer >= ROAM_CHANGE) {
             roamTimer = 0;
             pickNewDirection();
+        }
+
+        frameTick++;
+
+        if (frameTick >= frameSpeed) {
+            frameTick = 0;
+            frame = (frame + 1) % maxFrames;
         }
     }
 
@@ -83,22 +107,22 @@ public class Enemy {
         int sx = x - cam.offsetX();
         int sy = y - cam.offsetY();
 
-        if (sprite != null) {
-            g2.drawImage(sprite, sx, sy, W, H, null);
-        } else {
-            // Fallback: draw a spooky dark blob
-            g2.setColor(new Color(20, 10, 30, 220));
-            g2.fillOval(sx, sy, W, H);
-            g2.setColor(new Color(120, 80, 200, 180));
-            g2.setStroke(new BasicStroke(2f));
-            g2.drawOval(sx, sy, W, H);
-            // Eyes
-            g2.setColor(new Color(255, 255, 255, 200));
-            g2.fillOval(sx + 10, sy + 14, 8, 8);
-            g2.fillOval(sx + 28, sy + 14, 8, 8);
-            g2.setColor(new Color(180, 100, 255));
-            g2.fillOval(sx + 12, sy + 16, 4, 4);
-            g2.fillOval(sx + 30, sy + 16, 4, 4);
+        if (spriteSheet != null) {
+
+            int frameWidth = character.getFrameWidth();
+            int frameHeight = character.getFrameHeight();
+
+            int maxFrames = character.getMaxFrames();
+            frame %= maxFrames;
+
+            int sxFrame = frame * frameWidth;
+
+            g2.drawImage(
+                    spriteSheet,
+                    sx, sy, sx + W, sy + H,
+                    sxFrame, 0, sxFrame + frameWidth, frameHeight,
+                    null
+            );
         }
 
         // HP bar above enemy

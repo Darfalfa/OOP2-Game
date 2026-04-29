@@ -18,6 +18,8 @@ abstract public class Character {
     private int gold;
     private int healthPotion = 0;
     private int expPotion = 0;
+    private int turnCounter = 0;
+    private String spritePath;
 
     public Character(String name, int hp, int defense, int baseExp, int level) {
         this.name = name;
@@ -123,6 +125,22 @@ abstract public class Character {
             return random.nextInt(18 - 10 + 1) + 10;
         else 
             return 5;
+    }
+
+    public String getSpritePath() {
+        return spritePath;
+    }
+
+    public int getFrameWidth() {
+        return 210;
+    }
+
+    public int getFrameHeight() {
+        return 203;
+    }
+
+    public int getMaxFrames() {
+        return 12;
     }
 
     //LOGICS
@@ -252,6 +270,27 @@ abstract public class Character {
         }
     }
 
+    public String handleAutoHeal() {
+        turnCounter++;
+
+        if (turnCounter % 3 == 0) {
+            int oldHp = hp;
+
+            setHp(hp + 15);
+
+            int healed = hp - oldHp;
+
+            return "Wens appears and restores " + healed + " HP to " + name + "!";
+        }
+
+        return null;
+    }
+
+    public void resetTurnCounter() {
+        turnCounter = 0;
+    }
+
+    public abstract String getSkillSfx(int skillNumber);
     public abstract String getSkillDamageRange(int skillNumber);
     public abstract String getBackgroundInfo();
     public abstract int useSkill(int skillNumber, Character enemy);
