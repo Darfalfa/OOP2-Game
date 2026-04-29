@@ -120,6 +120,8 @@ public class ShadowLogic extends Character {
 
     @Override
     public double getScale() {
-        return 0.25;
+        // Shadow sprite sheet frames are 959×639 px.
+        // 0.10 → ~96×64 px on screen — consistent regular-mob size.
+        return 0.10;
     }
 }

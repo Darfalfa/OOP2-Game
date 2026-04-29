@@ -153,12 +153,12 @@ public class FinalBossLogic extends Character {
 
     @Override
     public int getVerticalOffset() {
-        return 20;
+        return 40;
     }
 
     @Override
     public double getScale() {
-        return 0.4;
+        return 0.68;
     }
 
     @Override

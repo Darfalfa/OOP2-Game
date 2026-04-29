@@ -114,4 +114,15 @@ public class CultistLogic extends Character {
     public int getMaxFrames() {
         return 12; // Both levels use 12 frames
     }
+
+    @Override
+    public double getScale() {
+        // Cultist frame: 242×250 → 0.35 = ~85×88 px — consistent mob size
+        return 0.35;
+    }
+
+    @Override
+    public int getVerticalOffset() {
+        return 10;
+    }
 }

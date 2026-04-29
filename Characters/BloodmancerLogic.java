@@ -152,12 +152,12 @@ public class BloodmancerLogic extends Character {
 
     @Override
     public int getVerticalOffset() {
-        return 20;
+        return 30;
     }
 
     @Override
     public double getScale() {
-        return 0.4;
+        return 1.10;
     }
 
     @Override

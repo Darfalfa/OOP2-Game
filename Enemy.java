@@ -104,8 +104,28 @@ public class Enemy {
 
     public void draw(Graphics2D g2, Camera cam) {
         if (defeated) return;
-        int sx = x - cam.offsetX();
-        int sy = y - cam.offsetY();
+
+        // Apply the character's scale so bosses and mini-bosses are clearly
+        // bigger than the player, and regular mobs are visually distinct.
+        double scale = character.getScale();
+
+        // Compute display size from scale, but use a sensible minimum so tiny
+        // mobs (scale=0.10) still show at a visible size on the world map.
+        int drawW = Math.max(W, (int)(character.getFrameWidth()  * scale));
+        int drawH = Math.max(H, (int)(character.getFrameHeight() * scale));
+
+        // Cap boss sprites so they never dwarf the entire screen on the map.
+        int maxMapSize = W * 4; // 4× the tile size = 192 px
+        if (drawW > maxMapSize) {
+            double ratio = (double) maxMapSize / drawW;
+            drawW = maxMapSize;
+            drawH = (int)(drawH * ratio);
+        }
+
+        // Anchor bottom-center of the sprite to the enemy's world position
+        // so the collision box (x,y) stays meaningful for detection.
+        int sx = x - cam.offsetX() - (drawW - W) / 2;
+        int sy = y - cam.offsetY() - (drawH - H);
 
         if (spriteSheet != null) {
 
@@ -119,14 +139,14 @@ public class Enemy {
 
             g2.drawImage(
                     spriteSheet,
-                    sx, sy, sx + W, sy + H,
+                    sx, sy, sx + drawW, sy + drawH,
                     sxFrame, 0, sxFrame + frameWidth, frameHeight,
                     null
             );
         }
 
         // HP bar above enemy
-        int barW = W, barH = 5;
+        int barW = drawW, barH = 5;
         int barX = sx, barY = sy - 10;
         g2.setColor(new Color(60, 0, 0));
         g2.fillRect(barX, barY, barW, barH);

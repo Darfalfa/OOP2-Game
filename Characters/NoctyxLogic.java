@@ -152,12 +152,12 @@ public class NoctyxLogic extends Character {
 
     @Override
     public int getVerticalOffset() {
-        return 20;
+        return 30;
     }
 
     @Override
     public double getScale() {
-        return 0.4;
+        return 0.66;
     }
 
     @Override

@@ -105,6 +105,13 @@ public class BattleScreen extends JPanel {
     private int skillAnimTicks = 0;
     private boolean skillOnEnemy = false;
 
+    // Snapshot of the enemy's draw position at the moment a skill fires.
+    // Used so the skill animation stays locked to the same spot as the idle sprite.
+    private int frozenEnemyX = 0;
+    private int frozenEnemyY = 0;
+    private int frozenEnemyW = 0;
+    private int frozenEnemyH = 0;
+
     // Per-character battle sprites (loaded once, swapped on character change)
     private BufferedImage ayaBattleSprite;
     private BufferedImage ronnixBattleSprite;
@@ -152,7 +159,7 @@ public class BattleScreen extends JPanel {
         logScroll.setViewportBorder(null);
         logScroll.getViewport().setBackground(new Color(10, 5, 20));
 
-        setLayout(null); 
+        setLayout(null);
         add(logScroll);
 
         loadAllSprites();
@@ -209,15 +216,15 @@ public class BattleScreen extends JPanel {
     @Override
     public void doLayout() {
         super.doLayout();
-        int btnAreaHeight = 90;    
+        int btnAreaHeight = 90;
         int logHeight = 110;
         int gap = 20;
 
         logScroll.setBounds(
-            40,
-            getHeight() - btnAreaHeight - logHeight - gap,
-            getWidth() - 80,
-            logHeight
+                40,
+                getHeight() - btnAreaHeight - logHeight - gap,
+                getWidth() - 80,
+                logHeight
         );
     }
 
@@ -347,7 +354,7 @@ public class BattleScreen extends JPanel {
 
     public void stopBattle() { animTimer.stop(); }
 
-    private void playSkillAnimation(Character attacker, int skillNumber, boolean onEnemy) {
+    private void playSkillAnimation(Character attacker, int skillNumber, boolean attackerIsEnemy) {
         String path = attacker.getSkillSprite(skillNumber);
 
         if (path == null) return;
@@ -355,15 +362,80 @@ public class BattleScreen extends JPanel {
         skillSpriteSheet = tryLoadImage(path);
         if (skillSpriteSheet == null) return;
 
-        skillOnEnemy = onEnemy;
-        skillFrame = 0;
+        // Boss/enemy skill animations always play on the enemy side (right),
+        // centred on the enemy sprite — they are visual effects emanating FROM
+        // the boss, not a projectile hitting the player.
+        skillOnEnemy = true;
+
+        // Always reset to frame 0 so every skill starts from the beginning.
+        skillFrame     = 0;
         skillFrameTick = 0;
 
-        skillFrameWidth = attacker.getSkillFrameWidth(skillNumber);
+        skillFrameWidth  = attacker.getSkillFrameWidth(skillNumber);
         skillFrameHeight = attacker.getSkillFrameHeight(skillNumber);
-        skillMaxFrames = attacker.getSkillMaxFrames(skillNumber);
+        skillMaxFrames   = attacker.getSkillMaxFrames(skillNumber);
 
-        skillAnimTicks = skillMaxFrames * skillFrameSpeed;
+        // Give enough ticks so every frame is shown at the chosen speed.
+        skillAnimTicks = skillMaxFrames * skillFrameSpeed + skillFrameSpeed;
+
+        // frozenEnemyX/Y/W/H are kept up-to-date every paint frame (drawEnemyArea),
+        // so they are already correct at this point — no extra snapshot call needed.
+    }
+
+    /**
+     * Calculates and stores the enemy's current draw rect (without bounce)
+     * so skill animations can be pinned to the same spot.
+     * Uses the same sizing logic as drawEnemyArea so the snapshot matches exactly.
+     */
+    private void snapshotEnemyPosition() {
+        int W = getWidth(), H = getHeight();
+        if (W <= 0 || H <= 0) return; // not yet laid out — skip
+        int groundY = (int)(H * 0.72);
+        int centerX = (int)(W * 0.65);
+
+        int[] size = computeEnemyDrawSize(groundY);
+        int eW = size[0], eH = size[1];
+
+        int ex = centerX - eW / 2;
+        int ey = groundY - eH + enemyCharacter.getVerticalOffset();
+
+        frozenEnemyX = ex;
+        frozenEnemyY = ey;
+        frozenEnemyW = eW;
+        frozenEnemyH = eH;
+    }
+
+    /**
+     * Computes the draw size [width, height] for the enemy sprite.
+     * Bosses (isFinalBoss) are rendered at 3× the average player sprite size
+     * (~120×160 px), giving a target of ~360×480 px scaled to fit the screen.
+     * Regular enemies use the character's getScale() value.
+     */
+    private int[] computeEnemyDrawSize(int groundY) {
+        int eW, eH;
+
+        if (enemyCharacter.isFinalBoss()) {
+            // Target 3× player height. Player sprites are ~155-170 px tall.
+            // Use 160 px as the reference player height → boss target = 480 px.
+            int targetH = (int)(groundY * 0.82); // cap at 82% of groundY so full body fits
+            double aspect = (double) frameWidth / frameHeight;
+            eH = targetH;
+            eW = (int)(eH * aspect);
+        } else {
+            double scale = enemyCharacter.getScale();
+            eW = (int)(frameWidth  * scale);
+            eH = (int)(frameHeight * scale);
+
+            // For regular enemies, keep the existing modest cap
+            int maxAllowedH = (int)(groundY * 0.65);
+            if (eH > maxAllowedH) {
+                double ratio = (double) maxAllowedH / eH;
+                eH = maxAllowedH;
+                eW = (int)(eW * ratio);
+            }
+        }
+
+        return new int[]{eW, eH};
     }
 
     // ── Input ─────────────────────────────────────────────────────────────────
@@ -384,8 +456,8 @@ public class BattleScreen extends JPanel {
                 if (prev != hoveredBtn) repaint();
 
                 setCursor(hoveredBtn >= 0
-                    ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                    : Cursor.getDefaultCursor());
+                        ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                        : Cursor.getDefaultCursor());
             }
         });
 
@@ -501,7 +573,7 @@ public class BattleScreen extends JPanel {
         }
     }
     */
-    
+
 
     private void afterPlayerAction() {
         usedPotionThisTurn = false;
@@ -523,7 +595,7 @@ public class BattleScreen extends JPanel {
             playerCharacter.receiveBattleRewards(gainedXp, gainedGold);
             playerCharacter.restoreStats();
             playerCharacter.resetCooldowns();
-            enemyCharacter.restoreStats(); 
+            enemyCharacter.restoreStats();
 
             addLog("Gained " + gainedXp + " XP and " + gainedGold + " gold!");
             addLog("HP restored and cooldowns reset.");
@@ -568,13 +640,13 @@ public class BattleScreen extends JPanel {
 
         if (playerCharacter.getHp() <= 0) {
             addLog(playerCharacter.getName() + " has been defeated!");
-            
+
             int lost = playerCharacter.loseRandomExp();
             addLog("Lost " + lost + " EXP.");
-            
+
             playerCharacter.restoreStats();
             playerCharacter.resetCooldowns();
-            enemyCharacter.restoreStats(); 
+            enemyCharacter.restoreStats();
 
             playerWon = false;
             stopBattle();
@@ -590,7 +662,7 @@ public class BattleScreen extends JPanel {
 
         Timer healDelay = new Timer(900, e -> {
 
-            isHealingPhase = true; 
+            isHealingPhase = true;
 
             if (playerCharacter.getLevel() >= 4) {
 
@@ -605,7 +677,7 @@ public class BattleScreen extends JPanel {
 
             // Wait for Wens animation before unlocking
             Timer unlock = new Timer(1200, ev -> {
-                isHealingPhase = false; 
+                isHealingPhase = false;
 
                 phase = Phase.PLAYER_TURN;
                 addLog("Your turn — choose an action.");
@@ -635,7 +707,7 @@ public class BattleScreen extends JPanel {
         }
 
         if (available.isEmpty()) {
-            return 1; 
+            return 1;
         }
 
         return available.get(enemyCharacter.random.nextInt(available.size()));
@@ -673,7 +745,7 @@ public class BattleScreen extends JPanel {
         flashColor = c;
         flashTicks = 8;
     }
-    
+
 
     // ── Paint ─────────────────────────────────────────────────────────────────
     @Override
@@ -716,8 +788,8 @@ public class BattleScreen extends JPanel {
             g2.fillRect(0, yy, W, 40);
         }
 
-        // Ground
-        int groundY = (int)(H * 0.62);
+        // Ground line — visual midpoint between player stand (65%) and boss stand (82%)
+        int groundY = (int)(H * 0.72);
         GradientPaint ground = new GradientPaint(0, groundY, new Color(30, 15, 40), 0, H, new Color(10, 5, 15));
         g2.setPaint(ground);
         g2.fillRect(0, groundY, W, H - groundY);
@@ -728,34 +800,48 @@ public class BattleScreen extends JPanel {
 
         // Vignette
         RadialGradientPaint vig = new RadialGradientPaint(
-            new Point2D.Float(W/2f, H/2f), Math.max(W,H)*0.75f,
-            new float[]{0.3f, 1f},
-            new Color[]{new Color(0,0,0,0), new Color(0,0,0,200)});
+                new Point2D.Float(W/2f, H/2f), Math.max(W,H)*0.75f,
+                new float[]{0.3f, 1f},
+                new Color[]{new Color(0,0,0,0), new Color(0,0,0,200)});
         g2.setPaint(vig);
         g2.fillRect(0, 0, W, H);
     }
 
     private void drawEnemyArea(Graphics2D g2, int W, int H) {
-        int groundY = (int)(H * 0.62);
+        int groundY = (int)(H * 0.72);
         int centerX = (int)(W * 0.65);
 
-        // Shadow beneath enemy
-        g2.setColor(new Color(0, 0, 0, 80));
-        g2.fillOval(centerX - 50, groundY - 10, 100, 20);
+        // Freeze bounce while the skill animation is playing so the sprite
+        // reappears exactly where it was when the skill fired.
+        boolean enemyUsingSkill2 = skillAnimTicks > 0 && skillOnEnemy;
+        double bounce = enemyUsingSkill2 ? 0 : Math.sin(animTick * 0.05) * 6;
 
-        double bounce = Math.sin(animTick * 0.05) * 6;
-        double scale = enemyCharacter.getScale();
-
-        int eW = (int)(frameWidth * scale);
-        int eH = (int)(frameHeight * scale);
+        int[] size = computeEnemyDrawSize(groundY);
+        int eW = size[0], eH = size[1];
 
         int ex = centerX - eW / 2;
-
         int ey = groundY - eH + enemyCharacter.getVerticalOffset() + (int)bounce;
+
+        // Keep the frozen snapshot up-to-date every frame when idle.
+        // This guarantees that when a skill fires, snapshotEnemyPosition()
+        // returns values that exactly match what was just painted.
+        if (!enemyUsingSkill2) {
+            frozenEnemyX = ex;
+            frozenEnemyY = (int)(groundY - eH + enemyCharacter.getVerticalOffset()); // no bounce
+            frozenEnemyW = eW;
+            frozenEnemyH = eH;
+        }
+
+        // Scale the ground shadow to match the enemy footprint
+        int shadowW = Math.max(60, eW / 2);
+        g2.setColor(new Color(0, 0, 0, 80));
+        g2.fillOval(centerX - shadowW / 2, groundY - 10, shadowW, 20);
 
         int offX = (enemyShake && shakeTicks > 0) ? (int)shakeX : 0;
 
-        boolean enemyUsingSkill = skillAnimTicks > 0 && skillOnEnemy;
+        // Hide the enemy sprite while its own skill animation is playing —
+        // the skill sheet acts as a full replacement visual for that duration.
+        boolean enemyUsingSkill = enemyUsingSkill2;
 
         if (enemySpriteSheet != null && !enemyUsingSkill) {
 
@@ -788,7 +874,9 @@ public class BattleScreen extends JPanel {
      * Each character has a unique battle sprite and thematic visual effects.
      */
     private void drawPlayerArea(Graphics2D g2, int W, int H) {
-        int groundY = (int)(H * 0.62);
+        // Player always stands at 65% of screen height — independent of where
+        // the boss ground line is — so the character is never cut off.
+        int groundY = (int)(H * 0.65);
         int centerX = (int)(W * 0.28);
 
         boolean isRonnix = "Ronnix".equalsIgnoreCase(selectedCharacter);
@@ -852,11 +940,11 @@ public class BattleScreen extends JPanel {
         } else {
             // Fallback drawn silhouette when the sprite file is missing
             Color silColor  = isRonnix ? new Color(140, 40, 40, 200)
-                            : isJakara ? new Color(80, 30, 160, 200)
-                                       : new Color(60, 100, 140, 200);
+                    : isJakara ? new Color(80, 30, 160, 200)
+                      : new Color(60, 100, 140, 200);
             Color silBorder = isRonnix ? new Color(220, 80, 40)
-                            : isJakara ? new Color(190, 130, 255)
-                                       : new Color(100, 200, 220);
+                    : isJakara ? new Color(190, 130, 255)
+                      : new Color(100, 200, 220);
             g2.setColor(silColor);
             g2.fillRoundRect(px + offX, py, pW, pH, 20, 20);
             g2.setColor(silBorder);
@@ -880,8 +968,8 @@ public class BattleScreen extends JPanel {
         // ── Character name tag below sprite ───────────────────────────────────
         String charLabel = isRonnix ? "RONNIX" : isJakara ? "JAKARA" : "AYA";
         Color nameColor  = isRonnix ? new Color(220, 100,  80)
-                         : isJakara ? new Color(190, 130, 255)
-                                    : new Color(100, 210, 230);
+                : isJakara ? new Color(190, 130, 255)
+                  : new Color(100, 210, 230);
         g2.setFont(new Font("Serif", Font.BOLD, 14));
         FontMetrics fm = g2.getFontMetrics();
         int lx = centerX - fm.stringWidth(charLabel) / 2;
@@ -924,7 +1012,7 @@ public class BattleScreen extends JPanel {
     }
 
     private void enqueueIfBg(BufferedImage img, int x, int y,
-                              boolean[][] visited, java.util.Queue<int[]> q) {
+                             boolean[][] visited, java.util.Queue<int[]> q) {
         if (x < 0 || y < 0 || x >= img.getWidth() || y >= img.getHeight()) return;
         if (visited[x][y]) return;
         visited[x][y] = true;
@@ -982,7 +1070,7 @@ public class BattleScreen extends JPanel {
     }
 
     private void drawStatBar(Graphics2D g2, int x, int y, int barW,
-                              String label, int cur, int max, Color fill) {
+                             String label, int cur, int max, Color fill) {
         int barH = 22;
         double pct = max <= 0 ? 0 : (double)cur / max;
 
@@ -1037,14 +1125,14 @@ public class BattleScreen extends JPanel {
     }
 
     private void drawButton(Graphics2D g2, String label, int x, int y, int w, int h,
-                             boolean hovered, boolean locked) {
+                            boolean hovered, boolean locked) {
         Color bg     = locked  ? new Color(50, 50, 60, 180)   // gray
-             : hovered ? new Color(70, 40, 10, 220)
-                       : new Color(25, 12, 35, 200);
+                : hovered ? new Color(70, 40, 10, 220)
+                  : new Color(25, 12, 35, 200);
 
         Color border = locked  ? new Color(120, 120, 130)     // light gray border
-                    : hovered ? GOLD_LIGHT
-                            : GOLD_DARK;
+                : hovered ? GOLD_LIGHT
+                  : GOLD_DARK;
 
         if (hovered) {
             g2.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 30));
@@ -1168,29 +1256,42 @@ public class BattleScreen extends JPanel {
 
     private void drawSkillAnimation(Graphics2D g2, int W, int H) {
         if (skillAnimTicks <= 0 || skillSpriteSheet == null) return;
+        if (skillFrameWidth <= 0 || skillFrameHeight <= 0) return;
 
-        int groundY = (int)(H * 0.62);
+        // Fit the skill animation inside the frozen enemy rect, preserving aspect ratio.
+        // This guarantees the skill effect NEVER exceeds the idle sprite's size.
+        double aspectRatio = (double) skillFrameWidth / skillFrameHeight;
 
-        int targetX = skillOnEnemy ? (int)(W * 0.65) : (int)(W * 0.28);
+        int maxW = frozenEnemyW;
+        int maxH = frozenEnemyH;
 
-        int targetY = skillOnEnemy
-                ? groundY - 70
-                : groundY - 130;
+        int drawH = maxH;
+        int drawW = (int)(drawH * aspectRatio);
+        if (drawW > maxW) {
+            drawW = maxW;
+            drawH = (int)(drawW / aspectRatio);
+        }
 
-        int drawW = skillOnEnemy ? 320 : 260;
-        int drawH = skillOnEnemy ? 260 : 180;
-        int sx = skillFrame * skillFrameWidth;
+        // Hard clamp — never exceed the frozen snapshot dimensions
+        drawW = Math.min(drawW, maxW);
+        drawH = Math.min(drawH, maxH);
 
+        // Centre within the frozen enemy rect.
+        int centerX = frozenEnemyX + frozenEnemyW / 2;
+        int centerY = frozenEnemyY + frozenEnemyH / 2;
+        int drawX   = centerX - drawW / 2;
+        int drawY   = centerY - drawH / 2;
+
+        // Guard against out-of-bounds frame
+        int safeFrame = skillFrame % skillMaxFrames;
+        int sx = safeFrame * skillFrameWidth;
 
         g2.drawImage(
                 skillSpriteSheet,
-                targetX - drawW / 2,
-                targetY - drawH / 2,
-                targetX + drawW / 2,
-                targetY + drawH / 2,
+                drawX,         drawY,
+                drawX + drawW, drawY + drawH,
                 sx, 0,
-                sx + skillFrameWidth,
-                skillFrameHeight,
+                sx + skillFrameWidth, skillFrameHeight,
                 null
         );
     }

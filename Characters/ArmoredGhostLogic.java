@@ -120,4 +120,16 @@ public class ArmoredGhostLogic extends Character {
     public int getMaxFrames() {
         return 12; // Both levels use 12 frames
     }
+
+    @Override
+    public double getScale() {
+        // Lv4 frame: 368×340 → 0.25 = ~92×85 px  ✓ consistent mob size
+        // Lv5 frame: 241×268 → 0.35 = ~84×94 px  ✓ consistent mob size
+        return (getLevel() == 5) ? 0.35 : 0.25;
+    }
+
+    @Override
+    public int getVerticalOffset() {
+        return 10;
+    }
 }

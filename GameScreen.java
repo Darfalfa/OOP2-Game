@@ -95,7 +95,7 @@ public class GameScreen extends JPanel implements Runnable {
     private boolean khaiDialogueOpen = false;
     private Image khaiDialogueImg;
     private boolean[] khaiDialogueTriggered = new boolean[10];
-    
+
     // Feedback message shown at the top of the shop (not blocking buttons)
     private String shopFeedback = "";
     private int shopFeedbackTimer = 0;
@@ -117,14 +117,14 @@ public class GameScreen extends JPanel implements Runnable {
     private static final int MESSAGE_DURATION = 120;
     private boolean shopMessageIsError = true;
 
-    
+
 
     public GameScreen(GameWindow window) {
         this.window = window;
         setBackground(Color.BLACK);
         setDoubleBuffered(true);
         setFocusable(true);
-        
+
         keyH = new KeyHandler(this);
         addKeyListener(keyH);
 
@@ -162,8 +162,8 @@ public class GameScreen extends JPanel implements Runnable {
                     else if (dialogueCloseBtn != null && dialogueCloseBtn.contains(p)) dialogueHovered = 1;
                     if (prevDH != dialogueHovered) repaint();
                     setCursor(dialogueHovered >= 0
-                        ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                        : Cursor.getDefaultCursor());
+                            ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                            : Cursor.getDefaultCursor());
                     return;
                 }
 
@@ -183,14 +183,14 @@ public class GameScreen extends JPanel implements Runnable {
                     else if (exitBtn       != null && exitBtn.contains(p))       hoveredBtn = exitBtn;
                     if (prevHov != hoveredBtn) repaint();
                     setCursor(hoveredBtn != null
-                        ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                        : Cursor.getDefaultCursor());
+                            ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                            : Cursor.getDefaultCursor());
                     return;
                 }
 
                 setCursor(menuBtnHovered
-                    ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                    : Cursor.getDefaultCursor());
+                        ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                        : Cursor.getDefaultCursor());
             }
         });
 
@@ -403,23 +403,47 @@ public class GameScreen extends JPanel implements Runnable {
             return;
         }
 
-        int margin = 200;
-        int spawnW = Math.max(1, worldWidth  - margin * 2 - Enemy.W);
-        int spawnH = Math.max(1, worldHeight - margin * 2 - Enemy.H);
+        // Use at least 2 tiles as safe margin from every edge to guarantee
+        // enemies never appear on border tiles or outside the playable area.
+        int margin = Math.max(200, tileSize * 3);
+        int spawnMinX = margin;
+        int spawnMinY = margin;
+        int spawnMaxX = worldWidth  - margin - Enemy.W;
+        int spawnMaxY = worldHeight - margin - Enemy.H;
+
+        // Guard against degenerate worlds
+        if (spawnMaxX <= spawnMinX) spawnMaxX = spawnMinX + 1;
+        if (spawnMaxY <= spawnMinY) spawnMaxY = spawnMinY + 1;
 
         for (int i = 0; i < ENEMY_COUNT; i++) {
-            int ex, ey;
-            int attempts = 0;
+            int ex = 0, ey = 0;
+            boolean placed = false;
 
-            do {
-                ex = margin + (int)(Math.random() * spawnW);
-                ey = margin + (int)(Math.random() * spawnH);
+            for (int attempts = 0; attempts < 200; attempts++) {
+                int candidateX = spawnMinX + (int)(Math.random() * (spawnMaxX - spawnMinX));
+                int candidateY = spawnMinY + (int)(Math.random() * (spawnMaxY - spawnMinY));
 
-                ex = Math.max(0, Math.min(ex, worldWidth  - Enemy.W));
-                ey = Math.max(0, Math.min(ey, worldHeight - Enemy.H));
+                // Skip positions that overlap a collision tile
+                if (isTileCollision(candidateX, candidateY, Enemy.W, Enemy.H)) continue;
 
-                attempts++;
-            } while (Math.hypot(ex - player.x, ey - player.y) < 300 && attempts < 100);
+                // Keep a safe distance from the player
+                if (Math.hypot(candidateX - player.x, candidateY - player.y) < 300) continue;
+
+                ex = candidateX;
+                ey = candidateY;
+                placed = true;
+                break;
+            }
+
+            // Last-resort fallback: place on the opposite side of the map from the player
+            if (!placed) {
+                ex = (player.x < worldWidth / 2)
+                        ? worldWidth  - margin - Enemy.W
+                        : margin;
+                ey = (player.y < worldHeight / 2)
+                        ? worldHeight - margin - Enemy.H
+                        : margin;
+            }
 
             Character enemyChar = EnemyFactory.createEnemyForLevel(playerCharacter.getLevel());
             enemies.add(new Enemy(ex, ey, enemyChar, this));
@@ -597,19 +621,31 @@ public class GameScreen extends JPanel implements Runnable {
                     // restore enemy stats
                     enemy.character.restoreStats();
 
-                    // respawn in random location (not near player, inside world bounds)
-                    int margin = 200;
-                    int spawnW = Math.max(1, worldWidth  - margin * 2 - Enemy.W);
-                    int spawnH = Math.max(1, worldHeight - margin * 2 - Enemy.H);
-                    int attempts = 0;
-                    do {
-                        enemy.x = margin + (int)(Math.random() * spawnW);
-                        enemy.y = margin + (int)(Math.random() * spawnH);
-                        // Clamp to valid world bounds just in case
-                        enemy.x = Math.max(0, Math.min(enemy.x, worldWidth  - Enemy.W));
-                        enemy.y = Math.max(0, Math.min(enemy.y, worldHeight - Enemy.H));
-                        attempts++;
-                    } while (Math.hypot(enemy.x - player.x, enemy.y - player.y) < 250 && attempts < 100);
+                    // respawn in random location (not near player, inside world bounds, not on a wall)
+                    int margin = Math.max(200, tileSize * 3);
+                    int spawnMinX = margin;
+                    int spawnMinY = margin;
+                    int spawnMaxX = worldWidth  - margin - Enemy.W;
+                    int spawnMaxY = worldHeight - margin - Enemy.H;
+                    if (spawnMaxX <= spawnMinX) spawnMaxX = spawnMinX + 1;
+                    if (spawnMaxY <= spawnMinY) spawnMaxY = spawnMinY + 1;
+
+                    boolean placed = false;
+                    for (int attempts = 0; attempts < 200; attempts++) {
+                        int cx = spawnMinX + (int)(Math.random() * (spawnMaxX - spawnMinX));
+                        int cy = spawnMinY + (int)(Math.random() * (spawnMaxY - spawnMinY));
+                        if (isTileCollision(cx, cy, Enemy.W, Enemy.H)) continue;
+                        if (Math.hypot(cx - player.x, cy - player.y) < 250) continue;
+                        enemy.x = cx;
+                        enemy.y = cy;
+                        placed = true;
+                        break;
+                    }
+                    if (!placed) {
+                        // fallback: opposite corner from player
+                        enemy.x = (player.x < worldWidth  / 2) ? worldWidth  - margin - Enemy.W : margin;
+                        enemy.y = (player.y < worldHeight / 2) ? worldHeight - margin - Enemy.H : margin;
+                    }
                 }
 
                 continue;
@@ -801,7 +837,7 @@ public class GameScreen extends JPanel implements Runnable {
         // Draw the chatbox image
         if (makoChatboxImg != null) {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g2.drawImage(makoChatboxImg, imgX, imgY, imgW, imgH, null);
         } else {
             // Fallback plain box
@@ -830,7 +866,7 @@ public class GameScreen extends JPanel implements Runnable {
         int lineGap    = (int)(boxH * 0.14);
 
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-                            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setFont(new Font("Serif", Font.PLAIN, 15));
         g2.setColor(new Color(215, 210, 235));
         g2.drawString("*Yawn* Yeah ... welcome to the tavern.", textX, textStartY);
@@ -852,14 +888,14 @@ public class GameScreen extends JPanel implements Runnable {
         dialogueCloseBtn = new Rectangle(closeBtnX, btnY, btnW, btnH);
 
         drawDialogueButton(g2, "Shop",  shopBtnX,  btnY, btnW, btnH, dialogueHovered == 0,
-                           new Color(210, 170, 60));
+                new Color(210, 170, 60));
         drawDialogueButton(g2, "Close", closeBtnX, btnY, btnW, btnH, dialogueHovered == 1,
-                           new Color(200, 195, 220));
+                new Color(200, 195, 220));
     }
 
     private void drawDialogueButton(Graphics2D g2, String label,
-                                     int x, int y, int w, int h,
-                                     boolean hovered, Color accent) {
+                                    int x, int y, int w, int h,
+                                    boolean hovered, Color accent) {
         // Only show design when actually hovered — no default highlight
         if (hovered) {
             // Outer glow
@@ -945,7 +981,7 @@ public class GameScreen extends JPanel implements Runnable {
         // Draw Wens' dialogue image at the same size as Mako's
         if (wensDialogueImg != null) {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g2.drawImage(wensDialogueImg, imgX, imgY, imgW, imgH, null);
         } else {
             // Fallback plain box (same as Mako's fallback)
@@ -956,7 +992,7 @@ public class GameScreen extends JPanel implements Runnable {
             g2.drawRoundRect(imgX, imgY, imgW, imgH, 14, 14);
         }
 
-    // Wens' image: portrait takes left ~38%, text box starts after that
+        // Wens' image: portrait takes left ~38%, text box starts after that
         int portraitEndX = imgX + (int)(imgW * 0.38);
         int boxTopY      = imgY + (int)(imgH * 148.0 / 468.0);
         int boxBotY      = imgY + (int)(imgH * 460.0 / 468.0);
@@ -970,7 +1006,7 @@ public class GameScreen extends JPanel implements Runnable {
         int lineGap    = (int)(boxH * 0.14);
 
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-                            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setFont(new Font("Serif", Font.PLAIN, 15));
         g2.setColor(new Color(215, 210, 235));
         g2.drawString("Traveler, you've proven your strength.", textX, textStartY);
@@ -995,7 +1031,7 @@ public class GameScreen extends JPanel implements Runnable {
 
         if (khaiDialogueImg != null) {
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g2.drawImage(khaiDialogueImg, imgX, imgY, imgW, imgH, null);
         } else {
             g2.setColor(new Color(20, 16, 42, 235));
@@ -1015,7 +1051,7 @@ public class GameScreen extends JPanel implements Runnable {
         int textStartY = boxTopY + (int)(boxH * 0.18);
 
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-                            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setFont(new Font("Serif", Font.PLAIN, 15));
         g2.setColor(new Color(215, 210, 235));
         g2.drawString("So\u2026 you\u2019ve finally made it this far.",          textX, textStartY);
@@ -1050,129 +1086,129 @@ public class GameScreen extends JPanel implements Runnable {
 
     private void drawShop(Graphics2D g2) {
 
-            if (playerCharacter == null) return;
+        if (playerCharacter == null) return;
 
-            int screenW = getWidth();
-            int screenH = getHeight();
+        int screenW = getWidth();
+        int screenH = getHeight();
 
-            // ===== BACKGROUND =====
-            g2.drawImage(shopBG, 0, 0, screenW, screenH, null);
+        // ===== BACKGROUND =====
+        g2.drawImage(shopBG, 0, 0, screenW, screenH, null);
 
-            // ===== MAKO =====
-            Image makoToDraw = makoBlink ? makoBlinkImg : makoImg;
-            g2.drawImage(makoToDraw, 60, screenH - 510, 350, 350, null);
+        // ===== MAKO =====
+        Image makoToDraw = makoBlink ? makoBlinkImg : makoImg;
+        g2.drawImage(makoToDraw, 60, screenH - 510, 350, 350, null);
 
-            // ===== GOLD =====
-            g2.setColor(Color.WHITE);
-            g2.setFont(new Font("Arial", Font.BOLD, 20));
-            g2.drawImage(coinImg, 20, 20, 30, 30, null);
-            g2.drawString(String.valueOf(playerCharacter.getGold()), 60, 45);
-            // ===== FEEDBACK MESSAGE (top-centre, never overlaps buttons) =====
-    if (shopFeedbackTimer > 0 && !shopFeedback.isEmpty()) {
-        float alpha = Math.min(1f, shopFeedbackTimer / 30f);
-        boolean isError = shopFeedback.contains("Not enough") || shopFeedback.contains("No potion");
-        Color bgColor  = isError ? new Color(180, 30, 30, (int)(200 * alpha))
-                                 : new Color(30, 130, 60,  (int)(200 * alpha));
-        Color txtColor = new Color(255, 255, 255, (int)(255 * alpha));
+        // ===== GOLD =====
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.BOLD, 20));
+        g2.drawImage(coinImg, 20, 20, 30, 30, null);
+        g2.drawString(String.valueOf(playerCharacter.getGold()), 60, 45);
+        // ===== FEEDBACK MESSAGE (top-centre, never overlaps buttons) =====
+        if (shopFeedbackTimer > 0 && !shopFeedback.isEmpty()) {
+            float alpha = Math.min(1f, shopFeedbackTimer / 30f);
+            boolean isError = shopFeedback.contains("Not enough") || shopFeedback.contains("No potion");
+            Color bgColor  = isError ? new Color(180, 30, 30, (int)(200 * alpha))
+                    : new Color(30, 130, 60,  (int)(200 * alpha));
+            Color txtColor = new Color(255, 255, 255, (int)(255 * alpha));
 
-        g2.setFont(new Font("Arial", Font.BOLD, 16));
-        FontMetrics fm2 = g2.getFontMetrics();
-        int msgW = fm2.stringWidth(shopFeedback) + 32;
-        int msgH = 34;
-        int msgX = (screenW - msgW) / 2;
-        int msgY = 14;
+            g2.setFont(new Font("Arial", Font.BOLD, 16));
+            FontMetrics fm2 = g2.getFontMetrics();
+            int msgW = fm2.stringWidth(shopFeedback) + 32;
+            int msgH = 34;
+            int msgX = (screenW - msgW) / 2;
+            int msgY = 14;
 
-        g2.setColor(bgColor);
-        g2.fillRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
-        g2.setColor(txtColor);
-        g2.drawString(shopFeedback,
-                msgX + 16,
-                msgY + (msgH + fm2.getAscent() - fm2.getDescent()) / 2);
-    }
-
-            // ===== ITEM CARDS =====
-            int cardY = 120;
-
-            // CARD SETTINGS
-            int cardWidth = 260;
-            int spacing = 40;
-
-            // TOTAL WIDTH of both cards
-            int totalWidth = (cardWidth * 2) + spacing;
-
-            // START POSITION (adjust this to move left/right)
-            int startX = (screenW - totalWidth) / 2 + 120;
-
-            // FINAL POSITIONS
-            int leftX = startX;
-            int rightX = startX + cardWidth + spacing;
-
-            drawItemCard(g2, leftX, cardY, true);
-            drawItemCard(g2, rightX, cardY, false);
-            // ===== FEEDBACK MESSAGE =====
-    if (shopMessageTimer > 0 && !shopMessage.isEmpty()) {
-        float alpha = Math.min(1f, shopMessageTimer / 30f);
-        int a = (int)(alpha * 255);
-
-        g2.setFont(new Font("Arial", Font.BOLD, 16));
-        FontMetrics fmMsg = g2.getFontMetrics();
-        int msgW = fmMsg.stringWidth(shopMessage) + 32;
-        int msgH = 38;
-        int msgX = (screenW - msgW) / 2;
-        int msgY = screenH - 160;
-
-        Color bgCol = shopMessageIsError
-            ? new Color(120, 20, 20, Math.min(a, 210))
-            : new Color(20, 90, 20, Math.min(a, 210));
-        g2.setColor(bgCol);
-        g2.fillRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
-
-        Color borderCol = shopMessageIsError
-            ? new Color(220, 80, 80, a)
-            : new Color(80, 200, 80, a);
-        g2.setColor(borderCol);
-        g2.setStroke(new BasicStroke(1.5f));
-        g2.drawRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
-        g2.setStroke(new BasicStroke(1f));
-
-        g2.setColor(new Color(0, 0, 0, Math.min(a, 160)));
-        g2.drawString(shopMessage, msgX + 17, msgY + (msgH + fmMsg.getAscent() - fmMsg.getDescent()) / 2 + 1);
-        g2.setColor(new Color(255, 255, 255, a));
-        g2.drawString(shopMessage, msgX + 16, msgY + (msgH + fmMsg.getAscent() - fmMsg.getDescent()) / 2);
-    }
-            // ===== EXIT BUTTON =====
-    exitBtn = new Rectangle(160, screenH - 100, 150, 60);
-    boolean exitHov = hoveredBtn != null && hoveredBtn.equals(exitBtn);
-
-    // Outer glow on hover
-    if (exitHov) {
-        g2.setColor(new Color(160, 80, 220, 75));
-        g2.fillRoundRect(exitBtn.x - 6, exitBtn.y - 6,
-                         exitBtn.width + 12, exitBtn.height + 12, 12, 12);
-    }
-
-    g2.drawImage(exitBtnImg, exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, null);
-
-    // Bright overlay + border on hover
-    if (exitHov) {
-        g2.setColor(new Color(255, 255, 255, 40));
-        g2.fillRoundRect(exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, 6, 6);
-        g2.setColor(new Color(210, 160, 255, 220));
-        g2.setStroke(new BasicStroke(2f));
-        g2.drawRoundRect(exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, 6, 6);
-        g2.setStroke(new BasicStroke(1f));
-    }
-
-    // Text with drop shadow
-    g2.setFont(new Font("Arial", Font.BOLD, 16));
-    FontMetrics fmExit = g2.getFontMetrics();
-    int etx = exitBtn.x + (exitBtn.width - fmExit.stringWidth("EXIT")) / 2;
-    int ety = exitBtn.y + (exitBtn.height + fmExit.getAscent()) / 2 - 4;
-    g2.setColor(new Color(0, 0, 0, 160));
-    g2.drawString("EXIT", etx + 1, ety + 1);
-    g2.setColor(exitHov ? new Color(255, 238, 180) : Color.WHITE);
-    g2.drawString("EXIT", etx, ety);
+            g2.setColor(bgColor);
+            g2.fillRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
+            g2.setColor(txtColor);
+            g2.drawString(shopFeedback,
+                    msgX + 16,
+                    msgY + (msgH + fm2.getAscent() - fm2.getDescent()) / 2);
         }
+
+        // ===== ITEM CARDS =====
+        int cardY = 120;
+
+        // CARD SETTINGS
+        int cardWidth = 260;
+        int spacing = 40;
+
+        // TOTAL WIDTH of both cards
+        int totalWidth = (cardWidth * 2) + spacing;
+
+        // START POSITION (adjust this to move left/right)
+        int startX = (screenW - totalWidth) / 2 + 120;
+
+        // FINAL POSITIONS
+        int leftX = startX;
+        int rightX = startX + cardWidth + spacing;
+
+        drawItemCard(g2, leftX, cardY, true);
+        drawItemCard(g2, rightX, cardY, false);
+        // ===== FEEDBACK MESSAGE =====
+        if (shopMessageTimer > 0 && !shopMessage.isEmpty()) {
+            float alpha = Math.min(1f, shopMessageTimer / 30f);
+            int a = (int)(alpha * 255);
+
+            g2.setFont(new Font("Arial", Font.BOLD, 16));
+            FontMetrics fmMsg = g2.getFontMetrics();
+            int msgW = fmMsg.stringWidth(shopMessage) + 32;
+            int msgH = 38;
+            int msgX = (screenW - msgW) / 2;
+            int msgY = screenH - 160;
+
+            Color bgCol = shopMessageIsError
+                    ? new Color(120, 20, 20, Math.min(a, 210))
+                    : new Color(20, 90, 20, Math.min(a, 210));
+            g2.setColor(bgCol);
+            g2.fillRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
+
+            Color borderCol = shopMessageIsError
+                    ? new Color(220, 80, 80, a)
+                    : new Color(80, 200, 80, a);
+            g2.setColor(borderCol);
+            g2.setStroke(new BasicStroke(1.5f));
+            g2.drawRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
+            g2.setStroke(new BasicStroke(1f));
+
+            g2.setColor(new Color(0, 0, 0, Math.min(a, 160)));
+            g2.drawString(shopMessage, msgX + 17, msgY + (msgH + fmMsg.getAscent() - fmMsg.getDescent()) / 2 + 1);
+            g2.setColor(new Color(255, 255, 255, a));
+            g2.drawString(shopMessage, msgX + 16, msgY + (msgH + fmMsg.getAscent() - fmMsg.getDescent()) / 2);
+        }
+        // ===== EXIT BUTTON =====
+        exitBtn = new Rectangle(160, screenH - 100, 150, 60);
+        boolean exitHov = hoveredBtn != null && hoveredBtn.equals(exitBtn);
+
+        // Outer glow on hover
+        if (exitHov) {
+            g2.setColor(new Color(160, 80, 220, 75));
+            g2.fillRoundRect(exitBtn.x - 6, exitBtn.y - 6,
+                    exitBtn.width + 12, exitBtn.height + 12, 12, 12);
+        }
+
+        g2.drawImage(exitBtnImg, exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, null);
+
+        // Bright overlay + border on hover
+        if (exitHov) {
+            g2.setColor(new Color(255, 255, 255, 40));
+            g2.fillRoundRect(exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, 6, 6);
+            g2.setColor(new Color(210, 160, 255, 220));
+            g2.setStroke(new BasicStroke(2f));
+            g2.drawRoundRect(exitBtn.x, exitBtn.y, exitBtn.width, exitBtn.height, 6, 6);
+            g2.setStroke(new BasicStroke(1f));
+        }
+
+        // Text with drop shadow
+        g2.setFont(new Font("Arial", Font.BOLD, 16));
+        FontMetrics fmExit = g2.getFontMetrics();
+        int etx = exitBtn.x + (exitBtn.width - fmExit.stringWidth("EXIT")) / 2;
+        int ety = exitBtn.y + (exitBtn.height + fmExit.getAscent()) / 2 - 4;
+        g2.setColor(new Color(0, 0, 0, 160));
+        g2.drawString("EXIT", etx + 1, ety + 1);
+        g2.setColor(exitHov ? new Color(255, 238, 180) : Color.WHITE);
+        g2.drawString("EXIT", etx, ety);
+    }
 
     private void drawItemCard(Graphics2D g2, int x, int y, boolean isHealth) {
 
@@ -1271,74 +1307,143 @@ public class GameScreen extends JPanel implements Runnable {
 
         if (playerCharacter == null) return;
 
-int w = 600;
-        int h = 420;
         int padding = 20;
-        int maxTextWidth = w - padding * 2;
+        int w = 600;
+
+        // ── Pre-measure content height so the box never clips ────────────────
+        g2.setFont(new Font("Arial", Font.PLAIN, 13));
+        int bgTextH = measureWrappedText(g2, playerCharacter.getBackgroundInfo(), w - padding * 2);
+        // title + label + bg text + gap + stats section + skills section + items + footer
+        int statsH  = 18 * 4 + 8;          // 4 stat rows × 18 px + small gap
+        int skillsH = 18 + 20 * 3 + 8;     // header + 3 skill rows + gap
+        int itemsH  = 18 + 18 + 12;        // header + 1 row + gap
+        int h = padding                     // top padding
+                + 32                         // title row
+                + 16                         // "Background" label
+                + bgTextH + 14              // background text + gap
+                + statsH
+                + skillsH
+                + itemsH
+                + 24;                        // footer + bottom padding
+
+        h = Math.max(h, 380);             // minimum height
 
         int x = (getWidth() - w) / 2;
         int y = (getHeight() - h) / 2;
 
-        // ===== DRAW BOX =====
+        // ── Panel ────────────────────────────────────────────────────────────
         g2.setColor(new Color(20, 20, 40, 230));
         g2.fillRoundRect(x, y, w, h, 20, 20);
-
-        g2.setColor(Color.WHITE);
+        g2.setColor(GOLD_DARK);
+        g2.setStroke(new BasicStroke(1.5f));
         g2.drawRoundRect(x, y, w, h, 20, 20);
+        g2.setStroke(new BasicStroke(1f));
 
-// ===== TITLE =====
+        // ── Title ────────────────────────────────────────────────────────────
         g2.setFont(new Font("Arial", Font.BOLD, 18));
-        g2.drawString(playerCharacter.getName(), x + padding, y + 32);
+        g2.setColor(GOLD_LIGHT);
+        g2.drawString(playerCharacter.getName() + "  —  Lv " + playerCharacter.getLevel(),
+                x + padding, y + 30);
 
-        // ===== BACKGROUND =====
-        int bgX = x + padding;
-        int bgY = y + 55;
+        // ── Background ───────────────────────────────────────────────────────
+        int cy = y + 54;
 
         g2.setFont(new Font("Arial", Font.BOLD, 13));
-        g2.drawString("Background", bgX, bgY);
+        g2.setColor(GOLD);
+        g2.drawString("Background", x + padding, cy);
+        cy += 16;
 
         g2.setFont(new Font("Arial", Font.PLAIN, 13));
-        int textHeight = drawWrappedText(
-                g2,
-                playerCharacter.getBackgroundInfo(),
-                bgX,
-                bgY + 16,
-                maxTextWidth
-        );
+        g2.setColor(new Color(215, 210, 235));
+        int drawnH = drawWrappedText(g2, playerCharacter.getBackgroundInfo(),
+                x + padding, cy, w - padding * 2);
+        cy += drawnH + 14;
 
-        // ===== SKILLS =====
-        int skillX = x + padding;
-        int skillY = bgY + 16 + textHeight + 12;
+        // Divider
+        g2.setColor(GOLD_DARK);
+        g2.drawLine(x + padding, cy - 6, x + w - padding, cy - 6);
 
+        // ── Stats ────────────────────────────────────────────────────────────
         g2.setFont(new Font("Arial", Font.BOLD, 13));
-        g2.drawString("Skills", skillX, skillY);
+        g2.setColor(GOLD);
+        g2.drawString("Stats", x + padding, cy);
+        cy += 18;
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 13));
+        g2.setColor(new Color(215, 210, 235));
+
+        int col1 = x + padding;
+        int col2 = x + padding + 200;
+
+        // Row 1: HP and Defense
+        g2.drawString("HP: " + playerCharacter.getHp() + " / " + playerCharacter.getMaxHp(),
+                col1, cy);
+        g2.drawString("DEF: " + playerCharacter.getDefense() + " / " + playerCharacter.getMaxDefense(),
+                col2, cy);
+        cy += 18;
+
+        // Row 2: XP and Gold
+        g2.drawString("EXP: " + playerCharacter.getCurrentXp() + " / " + playerCharacter.getNextLevelXp(),
+                col1, cy);
+        g2.drawString("Gold: " + playerCharacter.getGold(),
+                col2, cy);
+        cy += 8;
+
+        // Divider
+        g2.setColor(GOLD_DARK);
+        g2.drawLine(x + padding, cy, x + w - padding, cy);
+        cy += 10;
+
+        // ── Skills ───────────────────────────────────────────────────────────
+        g2.setFont(new Font("Arial", Font.BOLD, 13));
+        g2.setColor(GOLD);
+        g2.drawString("Skills", x + padding, cy);
+        cy += 18;
 
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
-
-        int yOffset = skillY + 18;
 
         for (int i = 1; i <= 3; i++) {
-            String name = playerCharacter.getSkillName(i);
-            String dmg  = playerCharacter.getSkillDamageRange(i);
+            String skillName = playerCharacter.getSkillName(i);
+            String dmgRange  = playerCharacter.getSkillDamageRange(i);
+            int cd           = playerCharacter.getSkillCooldown(i);
 
-            g2.drawString(i + ": " + name + "   DMG: " + dmg, skillX, yOffset);
-            yOffset += 20;
+            // Skill name in white, damage range in gold, cooldown hint if > 0
+            g2.setColor(new Color(215, 210, 235));
+            g2.drawString(i + ": " + skillName, col1, cy);
+
+            g2.setColor(GOLD);
+            g2.drawString("DMG: " + dmgRange, col2, cy);
+
+            if (cd > 0) {
+                g2.setColor(new Color(200, 80, 80));
+                g2.drawString("  (CD: " + cd + ")", col2 + 120, cy);
+            }
+            cy += 20;
         }
 
-        // ===== ITEMS =====
-        int itemY = yOffset + 8;
+        cy += 6;
 
+        // Divider
+        g2.setColor(GOLD_DARK);
+        g2.drawLine(x + padding, cy, x + w - padding, cy);
+        cy += 10;
+
+        // ── Items ────────────────────────────────────────────────────────────
         g2.setFont(new Font("Arial", Font.BOLD, 13));
-        g2.drawString("Items", x + padding, itemY);
+        g2.setColor(GOLD);
+        g2.drawString("Items", x + padding, cy);
+        cy += 18;
 
         g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        g2.drawString("HP Potion: " + playerCharacter.getHealthPotion() +
-                      "   EXP Potion: " + playerCharacter.getExpPotion(),
-                      x + padding, itemY + 18);
+        g2.setColor(new Color(215, 210, 235));
+        g2.drawString("HP Potion: "  + playerCharacter.getHealthPotion()
+                        + "     EXP Potion: " + playerCharacter.getExpPotion(),
+                x + padding, cy);
 
-        // ===== CLOSE =====
+        // ── Footer ───────────────────────────────────────────────────────────
         g2.setFont(new Font("Arial", Font.ITALIC, 11));
-        g2.drawString("Press I to close", x + w - 130, y + h - 12);
+        g2.setColor(new Color(160, 155, 180));
+        g2.drawString("Press I to close", x + w - 130, y + h - 10);
     }
 
     private int measureWrappedText(Graphics2D g2, String text, int maxWidth) {
@@ -1375,46 +1480,46 @@ int w = 600;
     }
 
     private void drawButton(Graphics2D g2, Rectangle rect, String text) {
-    // Use .equals() — rect is a new object every frame so == always fails
-    boolean hovered = hoveredBtn != null && hoveredBtn.equals(rect);
+        // Use .equals() — rect is a new object every frame so == always fails
+        boolean hovered = hoveredBtn != null && hoveredBtn.equals(rect);
 
-    // Outer glow on hover
-    if (hovered) {
-        g2.setColor(new Color(160, 80, 220, 75));
-        g2.fillRoundRect(rect.x - 6, rect.y - 6,
-                         rect.width + 12, rect.height + 12, 12, 12);
+        // Outer glow on hover
+        if (hovered) {
+            g2.setColor(new Color(160, 80, 220, 75));
+            g2.fillRoundRect(rect.x - 6, rect.y - 6,
+                    rect.width + 12, rect.height + 12, 12, 12);
+        }
+
+        // Base image (hover variant if available)
+        Image img = hovered ? buyBtnHoverImg : buyBtnImg;
+        g2.drawImage(img, rect.x, rect.y, rect.width, rect.height, null);
+
+        // Bright overlay + border on hover
+        if (hovered) {
+            g2.setColor(new Color(255, 255, 255, 40));
+            g2.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 6, 6);
+            g2.setColor(new Color(210, 160, 255, 220));
+            g2.setStroke(new BasicStroke(2f));
+            g2.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 6, 6);
+            g2.setStroke(new BasicStroke(1f));
+        }
+
+        // Text with drop shadow
+        g2.setFont(new Font("Arial", Font.BOLD, 14));
+        FontMetrics fm = g2.getFontMetrics();
+        int tx = rect.x + (rect.width - fm.stringWidth(text)) / 2;
+        int ty = rect.y + (rect.height + fm.getAscent()) / 2 - 4;
+
+        g2.setColor(new Color(0, 0, 0, 160));
+        g2.drawString(text, tx + 1, ty + 1);
+        g2.setColor(hovered ? new Color(255, 238, 180) : Color.WHITE);
+        g2.drawString(text, tx, ty);
     }
-
-    // Base image (hover variant if available)
-    Image img = hovered ? buyBtnHoverImg : buyBtnImg;
-    g2.drawImage(img, rect.x, rect.y, rect.width, rect.height, null);
-
-    // Bright overlay + border on hover
-    if (hovered) {
-        g2.setColor(new Color(255, 255, 255, 40));
-        g2.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 6, 6);
-        g2.setColor(new Color(210, 160, 255, 220));
-        g2.setStroke(new BasicStroke(2f));
-        g2.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 6, 6);
-        g2.setStroke(new BasicStroke(1f));
-    }
-
-    // Text with drop shadow
-    g2.setFont(new Font("Arial", Font.BOLD, 14));
-    FontMetrics fm = g2.getFontMetrics();
-    int tx = rect.x + (rect.width - fm.stringWidth(text)) / 2;
-    int ty = rect.y + (rect.height + fm.getAscent()) / 2 - 4;
-
-    g2.setColor(new Color(0, 0, 0, 160));
-    g2.drawString(text, tx + 1, ty + 1);
-    g2.setColor(hovered ? new Color(255, 238, 180) : Color.WHITE);
-    g2.drawString(text, tx, ty);
-}
     private void showShopMessage(String msg, boolean isError) {
-    shopMessage = msg;
-    shopMessageTimer = MESSAGE_DURATION;
-    shopMessageIsError = isError;
-}
+        shopMessage = msg;
+        shopMessageTimer = MESSAGE_DURATION;
+        shopMessageIsError = isError;
+    }
     private void drawHUD(Graphics2D g2) {
         int bW = 160, bH = 36, bX = 16, bY = 16;
         menuBtnRect = new Rectangle(bX, bY, bW, bH);
