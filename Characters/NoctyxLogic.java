@@ -89,4 +89,79 @@ public class NoctyxLogic extends Character {
                 return "0";
         }
     }
+
+    @Override
+    public String getSpritePath() {
+        return "images/Noctyx.png";
+    }
+
+    @Override
+    public int getFrameWidth() {
+        return 680;
+    }
+
+    @Override
+    public int getFrameHeight() {
+        return 656;
+    }
+
+    @Override
+    public int getMaxFrames() {
+        return 1;
+    }
+
+    @Override
+    public String getSkillSprite(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> "images/Noctyx_ShadowBlink.png";
+            case 2 -> "images/Noctyx_DarkSlash.png";
+            case 3 -> "images/Noctyx_VoidBurst.png";
+            default -> null;
+        };
+    }
+
+    @Override
+    public int getSkillFrameWidth(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 640;
+            case 2 -> 639;
+            case 3 -> 557;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillFrameHeight(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 640;
+            case 2 -> 639;
+            case 3 -> 515;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillMaxFrames(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 30;
+            case 2 -> 25;
+            case 3 -> 25;
+            default -> 1;
+        };
+    }
+
+    @Override
+    public int getVerticalOffset() {
+        return 20;
+    }
+
+    @Override
+    public double getScale() {
+        return 0.4;
+    }
+
+    @Override
+    public boolean isFinalBoss() {
+        return true;
+    }
 }

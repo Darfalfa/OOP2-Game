@@ -95,6 +95,16 @@ public class BattleScreen extends JPanel {
     private int frameWidth;
     private int frameHeight;
 
+    private BufferedImage skillSpriteSheet;
+    private int skillFrame = 0;
+    private int skillFrameTick = 0;
+    private int skillFrameSpeed = 4;
+    private int skillMaxFrames = 1;
+    private int skillFrameWidth;
+    private int skillFrameHeight;
+    private int skillAnimTicks = 0;
+    private boolean skillOnEnemy = false;
+
     // Per-character battle sprites (loaded once, swapped on character change)
     private BufferedImage ayaBattleSprite;
     private BufferedImage ronnixBattleSprite;
@@ -180,6 +190,17 @@ public class BattleScreen extends JPanel {
             }
 
             displayEnemyHp += (enemyCharacter.getHp() - displayEnemyHp) * 0.15f;
+
+            if (skillAnimTicks > 0) {
+                skillAnimTicks--;
+
+                skillFrameTick++;
+
+                if (skillFrameTick >= skillFrameSpeed) {
+                    skillFrameTick = 0;
+                    skillFrame = (skillFrame + 1) % skillMaxFrames;
+                }
+            }
 
             repaint();
         });
@@ -292,8 +313,6 @@ public class BattleScreen extends JPanel {
         this.playerCharacter = player;
         this.enemyCharacter = enemy;
 
-        this.enemyCharacter = EnemyFactory.createEnemyForLevel(player.getLevel());
-
         enemySpriteSheet =
                 tryLoadImage(enemyCharacter.getSpritePath());
 
@@ -301,10 +320,7 @@ public class BattleScreen extends JPanel {
         frameHeight = enemyCharacter.getFrameHeight();
 
         if (enemySpriteSheet != null) {
-
-            enemyMaxFrames =
-                    enemySpriteSheet.getWidth() / frameWidth;
-
+            enemyMaxFrames = enemySpriteSheet.getWidth() / frameWidth;
             enemyFrame = 0;
         }
 
@@ -330,6 +346,25 @@ public class BattleScreen extends JPanel {
     }
 
     public void stopBattle() { animTimer.stop(); }
+
+    private void playSkillAnimation(Character attacker, int skillNumber, boolean onEnemy) {
+        String path = attacker.getSkillSprite(skillNumber);
+
+        if (path == null) return;
+
+        skillSpriteSheet = tryLoadImage(path);
+        if (skillSpriteSheet == null) return;
+
+        skillOnEnemy = onEnemy;
+        skillFrame = 0;
+        skillFrameTick = 0;
+
+        skillFrameWidth = attacker.getSkillFrameWidth(skillNumber);
+        skillFrameHeight = attacker.getSkillFrameHeight(skillNumber);
+        skillMaxFrames = attacker.getSkillMaxFrames(skillNumber);
+
+        skillAnimTicks = skillMaxFrames * skillFrameSpeed;
+    }
 
     // ── Input ─────────────────────────────────────────────────────────────────
     private void setupListeners() {
@@ -475,7 +510,14 @@ public class BattleScreen extends JPanel {
         if (enemyCharacter.getHp() <= 0) {
             addLog(enemyCharacter.getName() + " was defeated!");
 
-            int gainedXp = enemyCharacter.getXpReward();
+            int gainedXp;
+
+            if (enemyCharacter.isFinalBoss()) {
+                gainedXp = playerCharacter.getNextLevelXp() - playerCharacter.getCurrentXp();
+            } else {
+                gainedXp = enemyCharacter.getXpReward();
+            }
+
             int gainedGold = enemyCharacter.getGoldReward();
 
             playerCharacter.receiveBattleRewards(gainedXp, gainedGold);
@@ -513,6 +555,8 @@ public class BattleScreen extends JPanel {
         }
 
         int dealt = enemyCharacter.useSkill(skillNum, playerCharacter);
+
+        playSkillAnimation(enemyCharacter, skillNum, true);
 
         addLog(enemyCharacter.getName() + " used " + enemyCharacter.getSkillName(skillNum) + "!");
         addLog("Dealt " + dealt + " damage!");
@@ -646,6 +690,7 @@ public class BattleScreen extends JPanel {
         drawEnemyArea(g2, W, H);
         drawPlayerArea(g2, W, H);
         drawWensEffect(g2, W, H);
+        drawSkillAnimation(g2, W, H);
         drawHpBars(g2, W, H);
         drawTurnTimer(g2, W, H);
         drawActionButtons(g2, W, H);
@@ -699,13 +744,20 @@ public class BattleScreen extends JPanel {
         g2.fillOval(centerX - 50, groundY - 10, 100, 20);
 
         double bounce = Math.sin(animTick * 0.05) * 6;
-        int eW = 140, eH = 140;
+        double scale = enemyCharacter.getScale();
+
+        int eW = (int)(frameWidth * scale);
+        int eH = (int)(frameHeight * scale);
+
         int ex = centerX - eW / 2;
-        int ey = groundY - eH - 20 + (int)bounce;
+
+        int ey = groundY - eH + enemyCharacter.getVerticalOffset() + (int)bounce;
 
         int offX = (enemyShake && shakeTicks > 0) ? (int)shakeX : 0;
 
-        if (enemySpriteSheet != null) {
+        boolean enemyUsingSkill = skillAnimTicks > 0 && skillOnEnemy;
+
+        if (enemySpriteSheet != null && !enemyUsingSkill) {
 
             int sx = enemyFrame * frameWidth;
 
@@ -1112,6 +1164,35 @@ public class BattleScreen extends JPanel {
         g2.drawImage(wensSprite, x, y, wensW, wensH, null);
 
         g2.setComposite(old);
+    }
+
+    private void drawSkillAnimation(Graphics2D g2, int W, int H) {
+        if (skillAnimTicks <= 0 || skillSpriteSheet == null) return;
+
+        int groundY = (int)(H * 0.62);
+
+        int targetX = skillOnEnemy ? (int)(W * 0.65) : (int)(W * 0.28);
+
+        int targetY = skillOnEnemy
+                ? groundY - 70
+                : groundY - 130;
+
+        int drawW = skillOnEnemy ? 320 : 260;
+        int drawH = skillOnEnemy ? 260 : 180;
+        int sx = skillFrame * skillFrameWidth;
+
+
+        g2.drawImage(
+                skillSpriteSheet,
+                targetX - drawW / 2,
+                targetY - drawH / 2,
+                targetX + drawW / 2,
+                targetY + drawH / 2,
+                sx, 0,
+                sx + skillFrameWidth,
+                skillFrameHeight,
+                null
+        );
     }
 
     // ── End overlay ───────────────────────────────────────────────────────────

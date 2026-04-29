@@ -103,17 +103,17 @@ public class ArmoredGhostLogic extends Character {
     @Override
     public int getFrameWidth() {
         if (getLevel() == 5) {
-            return 237; // Level 5 frame width
+            return 241; // Level 5 frame width
         }
-        return 309; // Level 4 frame width
+        return 368; // Level 4 frame width
     }
 
     @Override
     public int getFrameHeight() {
         if (getLevel() == 5) {
-            return 271; // Level 5 frame width
+            return 268; // Level 5 frame width
         }
-        return 301; // Level 4 frame width
+        return 340; // Level 4 frame width
     }
 
     @Override

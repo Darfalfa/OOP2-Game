@@ -93,27 +93,21 @@ public class CultistLogic extends Character {
     @Override
     public String getSpritePath() {
 
-        if (getLevel() == 5) {
+        if (getLevel() == 8) {
             return "images/CultistSpriteLv2.png";
         }
 
-        return "images/CultistSprite.png";
+        return "images/CultistSprite.png"; //7
     }
 
     @Override
     public int getFrameWidth() {
-        if (getLevel() == 8) {
-            return 237; // Level 8 frame width
-        }
-        return 309; // Level 7 frame width
+        return 242;
     }
 
     @Override
     public int getFrameHeight() {
-        if (getLevel() == 8) {
-            return 271; // Level 8 frame width
-        }
-        return 301; // Level 7 frame width
+        return 250;
     }
 
     @Override

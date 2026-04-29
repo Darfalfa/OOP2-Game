@@ -20,6 +20,9 @@ abstract public class Character {
     private int expPotion = 0;
     private int turnCounter = 0;
     private String spritePath;
+    private int frameWidth = 0;
+    private int frameHeight = 0;
+    private int maxFrames = 0;
 
     public Character(String name, int hp, int defense, int baseExp, int level) {
         this.name = name;
@@ -132,15 +135,43 @@ abstract public class Character {
     }
 
     public int getFrameWidth() {
-        return 210;
+        return frameWidth;
     }
 
     public int getFrameHeight() {
-        return 203;
+        return frameHeight;
     }
 
     public int getMaxFrames() {
-        return 12;
+        return maxFrames;
+    }
+
+    public String getSkillSprite(int skillNumber) {
+        return null;
+    }
+
+    public int getSkillFrameWidth(int skillNumber) {
+        return 0;
+    }
+
+    public int getSkillFrameHeight(int skillNumber) {
+        return 0;
+    }
+
+    public int getSkillMaxFrames(int skillNumber) {
+        return 1;
+    }
+
+    public int getVerticalOffset() {
+        return 0;
+    }
+
+    public double getScale() {
+        return 0.25;
+    }
+
+    public boolean isFinalBoss() {
+        return false;
     }
 
     //LOGICS

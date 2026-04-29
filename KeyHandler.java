@@ -19,26 +19,19 @@ public class KeyHandler implements KeyListener {
 
     @Override
     public void keyPressed(KeyEvent e) {
-
         int code = e.getKeyCode();
+
+        if (gameScreen.isDialogueOpen()) return;
 
         if (code == KeyEvent.VK_W) upPressed = true;
         if (code == KeyEvent.VK_S) downPressed = true;
         if (code == KeyEvent.VK_A) leftPressed = true;
         if (code == KeyEvent.VK_D) rightPressed = true;
 
-        gameScreen.handleShopInput(e.getKeyCode());
+        gameScreen.handleShopInput(code);
 
-        //if (e.getKeyCode() == KeyEvent.VK_E) {
-        //    gameScreen.openShopDialogue();
-        //}
-
-        if (e.getKeyCode() == KeyEvent.VK_E) {
+        if (code == KeyEvent.VK_E) {
             gameScreen.openShopDialogue();
-        }
-        
-        if (e.getKeyCode() == KeyEvent.VK_T) {
-            gameScreen.openWensDialogue();
         }
 
         gameScreen.handleInfoInput(code);
@@ -46,7 +39,6 @@ public class KeyHandler implements KeyListener {
 
     @Override
     public void keyReleased(KeyEvent e) {
-
         int code = e.getKeyCode();
 
         if (code == KeyEvent.VK_W) upPressed = false;

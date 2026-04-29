@@ -89,4 +89,80 @@ public class FinalBossLogic extends Character {
                 return "0";
         }
     }
+
+
+    @Override
+    public String getSpritePath() {
+        return "images/Khai.png";
+    }
+
+    @Override
+    public int getFrameWidth() {
+        return 432;
+    }
+
+    @Override
+    public int getFrameHeight() {
+        return 640;
+    }
+
+    @Override
+    public int getMaxFrames() {
+        return 1;
+    }
+
+    @Override
+    public String getSkillSprite(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> "images/Khai_Execute.png";
+            case 2 -> "images/Khai_SuddenQuiz.png";
+            case 3 -> "images/Khai_Codechum.png";
+            default -> null;
+        };
+    }
+
+    @Override
+    public int getSkillFrameWidth(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 960;
+            case 2 -> 960;
+            case 3 -> 960;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillFrameHeight(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 640;
+            case 2 -> 640;
+            case 3 -> 640;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillMaxFrames(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 16;
+            case 2 -> 16;
+            case 3 -> 16;
+            default -> 1;
+        };
+    }
+
+    @Override
+    public int getVerticalOffset() {
+        return 20;
+    }
+
+    @Override
+    public double getScale() {
+        return 0.4;
+    }
+
+    @Override
+    public boolean isFinalBoss() {
+        return true;
+    }
 }

@@ -89,4 +89,79 @@ public class BloodmancerLogic extends Character {
                 return "0";
         }
     }
+
+    @Override
+    public String getSpritePath() {
+        return "images/Bloodmancer.png";
+    }
+
+    @Override
+    public int getFrameWidth() {
+        return 402;
+    }
+
+    @Override
+    public int getFrameHeight() {
+        return 395;
+    }
+
+    @Override
+    public int getMaxFrames() {
+        return 1;
+    }
+
+    @Override
+    public String getSkillSprite(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> "images/Bloodmancer_CurseWave.png";
+            case 2 -> "images/Bloodmancer_SoulDrain.png";
+            case 3 -> "images/Bloodmancer_Hemoburst.png";
+            default -> null;
+        };
+    }
+
+    @Override
+    public int getSkillFrameWidth(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 544;
+            case 2 -> 544;
+            case 3 -> 543;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillFrameHeight(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 620;
+            case 2 -> 664;
+            case 3 -> 735;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillMaxFrames(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 30;
+            case 2 -> 30;
+            case 3 -> 30;
+            default -> 1;
+        };
+    }
+
+    @Override
+    public int getVerticalOffset() {
+        return 20;
+    }
+
+    @Override
+    public double getScale() {
+        return 0.4;
+    }
+
+    @Override
+    public boolean isFinalBoss() {
+        return true;
+    }
 }

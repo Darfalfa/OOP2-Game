@@ -105,22 +105,21 @@ public class ShadowLogic extends Character {
 
     @Override
     public int getFrameWidth() {
-        if (getLevel() == 2) {
-            return 288; // Level 2 frame width
-        }
-        return 210; // Level 1 frame width
+        return 959;
     }
 
     @Override
     public int getFrameHeight() {
-        if (getLevel() == 2) {
-            return 321; // Level 2 frame width
-        }
-        return 203; // Level 1 frame width
+        return 639; //
     }
 
     @Override
     public int getMaxFrames() {
         return 12; // Both levels use 12 frames
+    }
+
+    @Override
+    public double getScale() {
+        return 0.25;
     }
 }
