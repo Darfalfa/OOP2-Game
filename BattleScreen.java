@@ -103,6 +103,7 @@ public class BattleScreen extends JPanel {
     private int skillFrameWidth;
     private int skillFrameHeight;
     private int skillAnimTicks = 0;
+    private int activeSkillNumber = 0;
     private boolean skillOnEnemy = false;
 
     // Snapshot of the enemy's draw position at the moment a skill fires.
@@ -316,6 +317,19 @@ public class BattleScreen extends JPanel {
         this.hoveredBtn = -1;
         this.shakeTicks = 0;
         this.flashTicks = 0;
+        this.skillSpriteSheet = null;
+        this.skillAnimTicks = 0;
+        this.skillFrame = 0;
+        this.skillFrameTick = 0;
+        this.skillMaxFrames = 1;
+        this.skillFrameWidth = 0;
+        this.skillFrameHeight = 0;
+        this.activeSkillNumber = 0;
+        this.skillOnEnemy = false;
+        this.frozenEnemyX = 0;
+        this.frozenEnemyY = 0;
+        this.frozenEnemyW = 0;
+        this.frozenEnemyH = 0;
 
         this.playerCharacter = player;
         this.enemyCharacter = enemy;
@@ -374,6 +388,7 @@ public class BattleScreen extends JPanel {
         skillFrameWidth  = attacker.getSkillFrameWidth(skillNumber);
         skillFrameHeight = attacker.getSkillFrameHeight(skillNumber);
         skillMaxFrames   = attacker.getSkillMaxFrames(skillNumber);
+        activeSkillNumber = skillNumber;
 
         // Give enough ticks so every frame is shown at the chosen speed.
         skillAnimTicks = skillMaxFrames * skillFrameSpeed + skillFrameSpeed;
@@ -390,7 +405,7 @@ public class BattleScreen extends JPanel {
     private void snapshotEnemyPosition() {
         int W = getWidth(), H = getHeight();
         if (W <= 0 || H <= 0) return; // not yet laid out — skip
-        int groundY = (int)(H * 0.72);
+        int groundY = getEnemyGroundY(H);
         int centerX = (int)(W * 0.65);
 
         int[] size = computeEnemyDrawSize(groundY);
@@ -415,9 +430,9 @@ public class BattleScreen extends JPanel {
         int eW, eH;
 
         if (enemyCharacter.isFinalBoss()) {
-            // Target 3× player height. Player sprites are ~155-170 px tall.
-            // Use 160 px as the reference player height → boss target = 480 px.
-            int targetH = (int)(groundY * 0.82); // cap at 82% of groundY so full body fits
+            // Use the character's own height fraction so mid-tier bosses like
+            // Bloodmancer can be smaller than the true final bosses (Khai, Noctyx).
+            int targetH = (int)(groundY * enemyCharacter.getBossHeightFraction());
             double aspect = (double) frameWidth / frameHeight;
             eH = targetH;
             eW = (int)(eH * aspect);
@@ -426,8 +441,15 @@ public class BattleScreen extends JPanel {
             eW = (int)(frameWidth  * scale);
             eH = (int)(frameHeight * scale);
 
-            // For regular enemies, keep the existing modest cap
-            int maxAllowedH = (int)(groundY * 0.65);
+            // Regular enemies should be readable and stay clear of the battle log.
+            int minAllowedH = 170;
+            if (eH < minAllowedH) {
+                double ratio = (double) minAllowedH / eH;
+                eH = minAllowedH;
+                eW = (int)(eW * ratio);
+            }
+
+            int maxAllowedH = (int)(groundY * 0.48);
             if (eH > maxAllowedH) {
                 double ratio = (double) maxAllowedH / eH;
                 eH = maxAllowedH;
@@ -436,6 +458,30 @@ public class BattleScreen extends JPanel {
         }
 
         return new int[]{eW, eH};
+    }
+
+    private int getEnemyGroundY(int H) {
+        if (isBloodmancer()) {
+            int liftedBossLine = (int)(H * 0.62);
+            if (logScroll != null && logScroll.getY() > 0) {
+                liftedBossLine = Math.min(liftedBossLine, logScroll.getY() - 44);
+            }
+            return liftedBossLine;
+        }
+
+        if (enemyCharacter != null && enemyCharacter.isFinalBoss()) {
+            return (int)(H * 0.72);
+        }
+
+        int liftedBattleLine = (int)(H * 0.60);
+        if (logScroll != null && logScroll.getY() > 0) {
+            liftedBattleLine = Math.min(liftedBattleLine, logScroll.getY() - 32);
+        }
+        return liftedBattleLine;
+    }
+
+    private boolean isBloodmancer() {
+        return enemyCharacter != null && "Bloodmancer".equalsIgnoreCase(enemyCharacter.getName());
     }
 
     // ── Input ─────────────────────────────────────────────────────────────────
@@ -789,7 +835,7 @@ public class BattleScreen extends JPanel {
         }
 
         // Ground line — visual midpoint between player stand (65%) and boss stand (82%)
-        int groundY = (int)(H * 0.72);
+        int groundY = getEnemyGroundY(H);
         GradientPaint ground = new GradientPaint(0, groundY, new Color(30, 15, 40), 0, H, new Color(10, 5, 15));
         g2.setPaint(ground);
         g2.fillRect(0, groundY, W, H - groundY);
@@ -808,7 +854,7 @@ public class BattleScreen extends JPanel {
     }
 
     private void drawEnemyArea(Graphics2D g2, int W, int H) {
-        int groundY = (int)(H * 0.72);
+        int groundY = getEnemyGroundY(H);
         int centerX = (int)(W * 0.65);
 
         // Freeze bounce while the skill animation is playing so the sprite
@@ -1256,46 +1302,53 @@ public class BattleScreen extends JPanel {
 
     private void drawSkillAnimation(Graphics2D g2, int W, int H) {
         if (skillAnimTicks <= 0 || skillSpriteSheet == null) return;
-        if (skillFrameWidth <= 0 || skillFrameHeight <= 0) return;
 
-        // Fit the skill animation inside the frozen enemy rect, preserving aspect ratio.
-        // This guarantees the skill effect NEVER exceeds the idle sprite's size.
-        double aspectRatio = (double) skillFrameWidth / skillFrameHeight;
-
-        int maxW = frozenEnemyW;
-        int maxH = frozenEnemyH;
-
-        int drawH = maxH;
-        int drawW = (int)(drawH * aspectRatio);
-        if (drawW > maxW) {
-            drawW = maxW;
-            drawH = (int)(drawW / aspectRatio);
-        }
-
-        // Hard clamp — never exceed the frozen snapshot dimensions
-        drawW = Math.min(drawW, maxW);
-        drawH = Math.min(drawH, maxH);
-
-        // Centre within the frozen enemy rect.
-        int centerX = frozenEnemyX + frozenEnemyW / 2;
-        int centerY = frozenEnemyY + frozenEnemyH / 2;
-        int drawX   = centerX - drawW / 2;
-        int drawY   = centerY - drawH / 2;
-
-        // Guard against out-of-bounds frame
         int safeFrame = skillFrame % skillMaxFrames;
         int sx = safeFrame * skillFrameWidth;
 
+        // 1. Define the PIVOT point (The feet/center of the character)
+        // We use the static coordinates captured when the skill started
+        int pivotX = frozenEnemyX + (frozenEnemyW / 2);
+        int pivotY = frozenEnemyY + frozenEnemyH;
+
+        // 2. Calculate dimensions
+        int drawW, drawH;
+        if (isBloodmancer()) {
+            drawW = frozenEnemyW;
+            drawH = frozenEnemyH;
+        } else if (enemyCharacter.isFinalBoss()) {
+            // Force the height to match the original idle height
+            double aspect = (double) skillFrameWidth / skillFrameHeight;
+            drawH = frozenEnemyH;
+            drawW = (int)(drawH * aspect);
+        } else {
+            drawW = frozenEnemyW;
+            drawH = frozenEnemyH;
+        }
+
+        double skillRenderScale = enemyCharacter.getSkillRenderScale(activeSkillNumber);
+        drawW = (int)(drawW * skillRenderScale);
+        drawH = (int)(drawH * skillRenderScale);
+
+        // 3. PIVOT-BASED RENDERING
+        // drawX: Center the sprite at the pivot
+        // drawY: Bottom-align the sprite at the pivot
+        int drawX = pivotX - (drawW / 2);
+        int drawY = pivotY - drawH;
+        int horizontalOffset = enemyCharacter.getSkillHorizontalOffset(activeSkillNumber);
+        int verticalOffset = enemyCharacter.getSkillVerticalOffset(activeSkillNumber);
+        drawX += (int)(horizontalOffset * ((double) drawW / skillFrameWidth));
+        drawY += (int)(verticalOffset * ((double) drawH / skillFrameHeight));
+
         g2.drawImage(
                 skillSpriteSheet,
-                drawX,         drawY,
+                drawX, drawY,
                 drawX + drawW, drawY + drawH,
                 sx, 0,
                 sx + skillFrameWidth, skillFrameHeight,
                 null
         );
     }
-
     // ── End overlay ───────────────────────────────────────────────────────────
     private void drawEndOverlay(Graphics2D g2, int W, int H) {
         g2.setColor(new Color(0, 0, 0, 160));

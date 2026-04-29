@@ -44,12 +44,12 @@ abstract public class Character {
         this.hp = Math.min(hp, maxHp);
     }
 
-    public void setDefense(int defense) { 
-        this.defense = defense; 
+    public void setDefense(int defense) {
+        this.defense = defense;
     }
 
-    public void setMaxDefense(int maxDefense) { 
-        this.maxDefense = maxDefense; 
+    public void setMaxDefense(int maxDefense) {
+        this.maxDefense = maxDefense;
     }
 
     public void setHealthPotion(int val) {
@@ -120,13 +120,13 @@ abstract public class Character {
     }
 
     public int getGoldReward() {
-        if (level >= 1 && level <= 3) 
+        if (level >= 1 && level <= 3)
             return random.nextInt(5 - 2 + 1) + 2;
-        else if (level >= 4 && level <= 6) 
+        else if (level >= 4 && level <= 6)
             return random.nextInt(10 - 5 + 1) + 5;
-        else if (level >= 7 && level <= 10) 
+        else if (level >= 7 && level <= 10)
             return random.nextInt(18 - 10 + 1) + 10;
-        else 
+        else
             return 5;
     }
 
@@ -162,6 +162,18 @@ abstract public class Character {
         return 1;
     }
 
+    public int getSkillHorizontalOffset(int skillNumber) {
+        return 0;
+    }
+
+    public double getSkillRenderScale(int skillNumber) {
+        return 1.0;
+    }
+
+    public int getSkillVerticalOffset(int skillNumber) {
+        return 0;
+    }
+
     public int getVerticalOffset() {
         return 0;
     }
@@ -170,8 +182,26 @@ abstract public class Character {
         return 0.25;
     }
 
+    public double getWorldMapScale() {
+        return getScale();
+    }
+
+    public int getWorldMapVerticalOffset() {
+        return 0;
+    }
+
     public boolean isFinalBoss() {
         return false;
+    }
+
+    /**
+     * For characters that use the boss draw path (isFinalBoss=true),
+     * controls how tall the sprite is as a fraction of groundY.
+     * Override to make a boss-path character smaller than the true final boss.
+     * Default 0.82 matches the existing Khai / Noctyx sizing.
+     */
+    public double getBossHeightFraction() {
+        return 0.82;
     }
 
     //LOGICS
@@ -181,11 +211,11 @@ abstract public class Character {
         this.maxDefense = (int)(baseDefense * (1 + 0.05 * (level - 1)));
         this.defense = maxDefense;
         this.nextLevelXp = (int)(baseExp * Math.pow(level, 1.5));
-    } 
+    }
 
     public void gainXp(int amount) {
         currentXp += amount;
-        
+
         while (currentXp >= nextLevelXp) {
             currentXp -= nextLevelXp;
             levelUp();
@@ -223,7 +253,7 @@ abstract public class Character {
         }
 
         hp -= remainingDamage;
-        if (hp < 0) 
+        if (hp < 0)
             hp = 0;
 
         return dmg;

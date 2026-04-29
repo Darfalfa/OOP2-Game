@@ -35,7 +35,7 @@ public class Ronnix extends Player {
         walkingForwardFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++) {
             walkingForwardFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkForward_f%02d.png", i));
+                    String.format(DIR + "walkForward_f%02d.png", i));
         }
 
         // ── Standing — dedicated idle sprites for all 8 directions ───────────────
@@ -52,7 +52,7 @@ public class Ronnix extends Player {
         walkingBackwardFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++) {
             walkingBackwardFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkBackward_f%02d.png", i));
+                    String.format(DIR + "walkBackward_f%02d.png", i));
         }
 
         // ── Walking left — 28 dedicated frames (sliced from 4-col × 7-row sheet) ──
@@ -60,8 +60,8 @@ public class Ronnix extends Player {
         walkingLeftFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++) {
             walkingLeftFrames[i - 1] = loadWithBgStrip(
-                String.format(DIR + "walkLeft_f%02d.png", i),
-                walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
+                    String.format(DIR + "walkLeft_f%02d.png", i),
+                    walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
         }
 
         // ── Walking right — 28 dedicated frames (sliced from 4-col × 7-row sheet) ──
@@ -69,24 +69,24 @@ public class Ronnix extends Player {
         walkingRightFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++) {
             walkingRightFrames[i - 1] = loadWithBgStrip(
-                String.format(DIR + "walkRight_f%02d.png", i),
-                walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
+                    String.format(DIR + "walkRight_f%02d.png", i),
+                    walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
         }
 
         // ── Diagonal down-left — 24 dedicated frames ──────────────────────────────
         walkingDiagonalDownLeftFrames = new BufferedImage[24];
         for (int i = 1; i <= 24; i++) {
             walkingDiagonalDownLeftFrames[i - 1] = tryLoad(
-                String.format(DIR + "walkDiagonalDownLeft_f%02d.png", i),
-                walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
+                    String.format(DIR + "walkDiagonalDownLeft_f%02d.png", i),
+                    walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
         }
 
         // ── Diagonal down-right — 24 dedicated frames ─────────────────────────────
         walkingDiagonalDownRightFrames = new BufferedImage[24];
         for (int i = 1; i <= 24; i++) {
             walkingDiagonalDownRightFrames[i - 1] = tryLoad(
-                String.format(DIR + "walkDiagonalDownRight_f%02d.png", i),
-                walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
+                    String.format(DIR + "walkDiagonalDownRight_f%02d.png", i),
+                    walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
         }
     }
 
@@ -95,20 +95,7 @@ public class Ronnix extends Player {
      * Returns a blank transparent sprite on failure so the game never crashes.
      */
     private BufferedImage loadDirect(String path) {
-        BufferedImage out = new BufferedImage(SPRITE_W, SPRITE_H, BufferedImage.TYPE_INT_ARGB);
-        try {
-            BufferedImage src = ImageIO.read(new File(path));
-            if (src != null) {
-                Graphics2D g2 = out.createGraphics();
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g2.drawImage(src, 0, 0, SPRITE_W, SPRITE_H, null);
-                g2.dispose();
-            }
-        } catch (IOException e) {
-            System.err.println("Ronnix: could not load " + path);
-        }
-        return out;
+        return loadCharacterSprite(path);
     }
 
     /**
@@ -117,36 +104,7 @@ public class Ronnix extends Player {
      * Falls back to the provided fallback image if the file is missing.
      */
     private BufferedImage loadWithBgStrip(String path, BufferedImage fallback) {
-        File f = new File(path);
-        if (!f.exists()) return fallback;
-
-        BufferedImage out = new BufferedImage(SPRITE_W, SPRITE_H, BufferedImage.TYPE_INT_ARGB);
-        try {
-            BufferedImage src = ImageIO.read(f);
-            if (src == null) return fallback;
-
-            // Convert to ARGB so we can manipulate alpha
-            BufferedImage argb = new BufferedImage(
-                    src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
-            Graphics2D tmp = argb.createGraphics();
-            tmp.drawImage(src, 0, 0, null);
-            tmp.dispose();
-
-            // Strip white/near-white/dotted background without touching character colours
-            stripBackground(argb);
-
-            // Scale to sprite dimensions
-            Graphics2D g2 = out.createGraphics();
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g2.drawImage(argb, 0, 0, SPRITE_W, SPRITE_H, null);
-            g2.dispose();
-
-        } catch (IOException e) {
-            System.err.println("Ronnix: could not load " + path);
-            return fallback;
-        }
-        return out;
+        return loadCharacterSprite(path, fallback);
     }
 
     /**
@@ -183,7 +141,7 @@ public class Ronnix extends Player {
     }
 
     private void enqueueBackground(BufferedImage img, int x, int y,
-                                    boolean[][] visited, java.util.Queue<int[]> queue) {
+                                   boolean[][] visited, java.util.Queue<int[]> queue) {
         if (x < 0 || y < 0 || x >= img.getWidth() || y >= img.getHeight()) return;
         if (visited[x][y]) return;
         visited[x][y] = true;
@@ -213,3 +171,4 @@ public class Ronnix extends Player {
         return fallback;
     }
 }
+

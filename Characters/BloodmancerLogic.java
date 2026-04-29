@@ -97,12 +97,12 @@ public class BloodmancerLogic extends Character {
 
     @Override
     public int getFrameWidth() {
-        return 402;
+        return 544;
     }
 
     @Override
     public int getFrameHeight() {
-        return 395;
+        return 620;
     }
 
     @Override
@@ -151,17 +151,33 @@ public class BloodmancerLogic extends Character {
     }
 
     @Override
+    public double getSkillRenderScale(int skillNumber) {
+        return 1.0;
+    }
+
+    @Override
     public int getVerticalOffset() {
-        return 30;
+        return -8;
     }
 
     @Override
     public double getScale() {
-        return 1.10;
+        // Not used for sizing because Bloodmancer uses the boss draw path.
+        return 0.81;
     }
 
     @Override
     public boolean isFinalBoss() {
+        // true so computeEnemyDrawSize uses the boss path for both idle and skills.
         return true;
+    }
+
+    /**
+     * Bloodmancer should be visually smaller than the true final bosses (Khai, Noctyx).
+     * The idle frame is 544x620, matching the skill sheets' placement box.
+     */
+    @Override
+    public double getBossHeightFraction() {
+        return 0.74;
     }
 }

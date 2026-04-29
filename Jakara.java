@@ -41,7 +41,7 @@ public class Jakara extends Player {
         walkingForwardFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++)
             walkingForwardFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkForward_f%02d.png", i));
+                    String.format(DIR + "walkForward_f%02d.png", i));
 
         // ── Walking right — 28 dedicated frames (pre-processed transparent PNGs) ──
         // Sliced from the 4-col × 7-row walking-right sprite sheet.
@@ -49,19 +49,19 @@ public class Jakara extends Player {
         walkingRightFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++)
             walkingRightFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkRight_f%02d.png", i));
+                    String.format(DIR + "walkRight_f%02d.png", i));
 
         // ── Walking left — 28 dedicated frames (black-bg sheet, stripped at load) ──
         walkingLeftFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++)
             walkingLeftFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkLeft_f%02d.png", i));
+                    String.format(DIR + "walkLeft_f%02d.png", i));
 
         // ── Walking backward — 28 dedicated frames (black-bg sheet, stripped at load) ──
         walkingBackwardFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++)
             walkingBackwardFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkBackward_f%02d.png", i));
+                    String.format(DIR + "walkBackward_f%02d.png", i));
     }
 
     /**
@@ -72,34 +72,7 @@ public class Jakara extends Player {
      * Returns a blank transparent sprite on failure so the game never crashes.
      */
     private BufferedImage loadDirect(String path) {
-        BufferedImage out = new BufferedImage(SPRITE_W, SPRITE_H, BufferedImage.TYPE_INT_ARGB);
-        try {
-            BufferedImage src = ImageIO.read(new File(path));
-            if (src != null) {
-                // Convert to ARGB so we can manipulate alpha
-                BufferedImage argb = new BufferedImage(
-                        src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
-                Graphics2D tmp = argb.createGraphics();
-                tmp.drawImage(src, 0, 0, null);
-                tmp.dispose();
-
-                // Auto-detect background type and strip accordingly.
-                // Pre-transparent PNGs (walkRight frames) are handled gracefully:
-                // their edge pixels are already alpha=0, so the flood-fill exits
-                // immediately without touching any character pixels.
-                stripBackground(argb);
-
-                // Scale to sprite dimensions
-                Graphics2D g2 = out.createGraphics();
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g2.drawImage(argb, 0, 0, SPRITE_W, SPRITE_H, null);
-                g2.dispose();
-            }
-        } catch (IOException e) {
-            System.err.println("Jakara: could not load " + path);
-        }
-        return out;
+        return loadCharacterSprite(path);
     }
 
     /** Tries to load a PNG (with background stripping); returns fallback if the file is missing. */
@@ -130,8 +103,8 @@ public class Jakara extends Player {
         // Sample the four corners to decide background type
         int cornerBrightness = 0;
         int[] corners = {
-            img.getRGB(0, 0), img.getRGB(w - 1, 0),
-            img.getRGB(0, h - 1), img.getRGB(w - 1, h - 1)
+                img.getRGB(0, 0), img.getRGB(w - 1, 0),
+                img.getRGB(0, h - 1), img.getRGB(w - 1, h - 1)
         };
         for (int c : corners) {
             cornerBrightness += ((c >> 16) & 0xFF);
@@ -185,11 +158,12 @@ public class Jakara extends Player {
             // White/dotted background — light AND near-neutral
             boolean isLight   = r > 190 && g > 190 && b > 190;
             boolean isNeutral = Math.abs(r - g) < 30
-                             && Math.abs(r - b) < 30
-                             && Math.abs(g - b) < 30;
+                    && Math.abs(r - b) < 30
+                    && Math.abs(g - b) < 30;
             isBg = isLight && isNeutral;
         }
 
         if (isBg) queue.add(new int[]{x, y});
     }
 }
+

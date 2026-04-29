@@ -39,19 +39,19 @@ public class Aya extends Player {
         walkingForwardFrames = new BufferedImage[21];
         for (int i = 1; i <= 21; i++)
             walkingForwardFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkForward_f%02d.png", i));
+                    String.format(DIR + "walkForward_f%02d.png", i));
 
         // ── Walking right (28 frames) ─────────────────────────────────────────────
         walkingRightFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++)
             walkingRightFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkRight_f%02d.png", i));
+                    String.format(DIR + "walkRight_f%02d.png", i));
 
         // ── Walking left (28 frames) ──────────────────────────────────────────────
         walkingLeftFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++)
             walkingLeftFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkLeft_f%02d.png", i));
+                    String.format(DIR + "walkLeft_f%02d.png", i));
 
         // ── Walking backward (28 frames) ──────────────────────────────────────────
         // PNGs are pre-padded to SPRITE_W × SPRITE_H aspect ratio so the character
@@ -59,7 +59,7 @@ public class Aya extends Player {
         walkingBackwardFrames = new BufferedImage[28];
         for (int i = 1; i <= 28; i++)
             walkingBackwardFrames[i - 1] = loadDirect(
-                String.format(DIR + "walkBackward_f%02d.png", i));
+                    String.format(DIR + "walkBackward_f%02d.png", i));
     }
 
     /**
@@ -68,31 +68,7 @@ public class Aya extends Player {
      * stretch-to-fill produces no distortion and keeps all animations the same size.
      */
     private BufferedImage loadDirect(String path) {
-        BufferedImage out = new BufferedImage(SPRITE_W, SPRITE_H, BufferedImage.TYPE_INT_ARGB);
-        try {
-            BufferedImage src = ImageIO.read(new File(path));
-            if (src != null) {
-                // Convert to ARGB
-                BufferedImage argb = new BufferedImage(
-                        src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
-                Graphics2D tmp = argb.createGraphics();
-                tmp.drawImage(src, 0, 0, null);
-                tmp.dispose();
-
-                // Strip near-white / lavender-dot background
-                stripBackground(argb);
-
-                // Stretch to fill the canvas — no letterboxing needed
-                Graphics2D g2 = out.createGraphics();
-                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                g2.drawImage(argb, 0, 0, SPRITE_W, SPRITE_H, null);
-                g2.dispose();
-            }
-        } catch (IOException e) {
-            System.err.println("Aya: could not load " + path);
-        }
-        return out;
+        return loadCharacterSprite(path);
     }
 
     /**
@@ -123,7 +99,7 @@ public class Aya extends Player {
     }
 
     private void enqueueWhite(BufferedImage img, int x, int y,
-                               boolean[][] visited, java.util.Queue<int[]> queue) {
+                              boolean[][] visited, java.util.Queue<int[]> queue) {
         if (x < 0 || y < 0 || x >= img.getWidth() || y >= img.getHeight()) return;
         if (visited[x][y]) return;
         visited[x][y] = true;
@@ -143,3 +119,4 @@ public class Aya extends Player {
         return fallback;
     }
 }
+

@@ -107,7 +107,7 @@ public class Enemy {
 
         // Apply the character's scale so bosses and mini-bosses are clearly
         // bigger than the player, and regular mobs are visually distinct.
-        double scale = character.getScale();
+        double scale = character.getWorldMapScale();
 
         // Compute display size from scale, but use a sensible minimum so tiny
         // mobs (scale=0.10) still show at a visible size on the world map.
@@ -115,7 +115,7 @@ public class Enemy {
         int drawH = Math.max(H, (int)(character.getFrameHeight() * scale));
 
         // Cap boss sprites so they never dwarf the entire screen on the map.
-        int maxMapSize = W * 4; // 4× the tile size = 192 px
+        int maxMapSize = character.isFinalBoss() ? W * 6 : W * 4;
         if (drawW > maxMapSize) {
             double ratio = (double) maxMapSize / drawW;
             drawW = maxMapSize;
@@ -125,7 +125,7 @@ public class Enemy {
         // Anchor bottom-center of the sprite to the enemy's world position
         // so the collision box (x,y) stays meaningful for detection.
         int sx = x - cam.offsetX() - (drawW - W) / 2;
-        int sy = y - cam.offsetY() - (drawH - H);
+        int sy = y - cam.offsetY() - (drawH - H) + character.getWorldMapVerticalOffset();
 
         if (spriteSheet != null) {
 
@@ -155,5 +155,17 @@ public class Enemy {
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(1f));
         g2.drawRect(barX, barY, barW, barH);
+
+        if (character.isFinalBoss()) {
+            String bossName = character.getName();
+            g2.setFont(new Font("Serif", Font.BOLD, 14));
+            FontMetrics fm = g2.getFontMetrics();
+            int nameX = sx + drawW / 2 - fm.stringWidth(bossName) / 2;
+            int nameY = barY - 6;
+            g2.setColor(new Color(0, 0, 0, 180));
+            g2.drawString(bossName, nameX + 1, nameY + 1);
+            g2.setColor(new Color(220, 190, 255));
+            g2.drawString(bossName, nameX, nameY);
+        }
     }
 }

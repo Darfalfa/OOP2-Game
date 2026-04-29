@@ -151,6 +151,22 @@ public class NoctyxLogic extends Character {
     }
 
     @Override
+    public double getSkillRenderScale(int skillNumber) {
+        return switch (skillNumber) {
+            case 3 -> 0.55;
+            default -> 1.0;
+        };
+    }
+
+    @Override
+    public int getSkillVerticalOffset(int skillNumber) {
+        return switch (skillNumber) {
+            case 3 -> -210;
+            default -> 0;
+        };
+    }
+
+    @Override
     public int getVerticalOffset() {
         return 30;
     }
@@ -158,6 +174,16 @@ public class NoctyxLogic extends Character {
     @Override
     public double getScale() {
         return 0.66;
+    }
+
+    @Override
+    public double getWorldMapScale() {
+        return 1.20;
+    }
+
+    @Override
+    public int getWorldMapVerticalOffset() {
+        return 65;
     }
 
     @Override

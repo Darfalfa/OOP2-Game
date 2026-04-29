@@ -1,6 +1,10 @@
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import javax.imageio.ImageIO;
 
 /**
  * Player — abstract base class for all playable characters.
@@ -104,10 +108,153 @@ public abstract class Player {
         BufferedImage out = new BufferedImage(SPRITE_W, SPRITE_H, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = out.createGraphics();
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                            RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+                RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         g2.drawImage(cropped, 0, 0, SPRITE_W, SPRITE_H, null);
         g2.dispose();
         return out;
+    }
+
+    protected BufferedImage loadCharacterSprite(String path) {
+        return loadCharacterSprite(path, null);
+    }
+
+    protected BufferedImage loadCharacterSprite(String path, BufferedImage fallback) {
+        File file = new File(path);
+        if (!file.exists()) {
+            return fallback != null ? fallback : blankSprite();
+        }
+
+        try {
+            BufferedImage src = ImageIO.read(file);
+            if (src == null) {
+                return fallback != null ? fallback : blankSprite();
+            }
+
+            BufferedImage argb = new BufferedImage(
+                    src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D tmp = argb.createGraphics();
+            tmp.drawImage(src, 0, 0, null);
+            tmp.dispose();
+
+            BufferedImage stripped = removeAutoBackground(argb);
+            Rectangle bounds = findOpaqueBounds(stripped);
+            if (bounds == null) {
+                return fallback != null ? fallback : blankSprite();
+            }
+
+            BufferedImage cropped = stripped.getSubimage(
+                    bounds.x, bounds.y, bounds.width, bounds.height);
+
+            BufferedImage out = blankSprite();
+            Graphics2D g2 = out.createGraphics();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+            int maxW = (int)(SPRITE_W * 0.90);
+            int maxH = (int)(SPRITE_H * 0.94);
+            double ratio = Math.min((double) maxW / cropped.getWidth(),
+                    (double) maxH / cropped.getHeight());
+            int drawW = Math.max(1, (int)Math.round(cropped.getWidth() * ratio));
+            int drawH = Math.max(1, (int)Math.round(cropped.getHeight() * ratio));
+            int drawX = (SPRITE_W - drawW) / 2;
+            int drawY = SPRITE_H - drawH - 2;
+
+            g2.drawImage(cropped, drawX, drawY, drawW, drawH, null);
+            g2.dispose();
+            return out;
+
+        } catch (IOException e) {
+            return fallback != null ? fallback : blankSprite();
+        }
+    }
+
+    private BufferedImage blankSprite() {
+        return new BufferedImage(SPRITE_W, SPRITE_H, BufferedImage.TYPE_INT_ARGB);
+    }
+
+    private Rectangle findOpaqueBounds(BufferedImage img) {
+        int minX = img.getWidth();
+        int minY = img.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+
+        for (int y = 0; y < img.getHeight(); y++) {
+            for (int x = 0; x < img.getWidth(); x++) {
+                int alpha = (img.getRGB(x, y) >> 24) & 0xFF;
+                if (alpha > 8) {
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+
+        if (maxX < minX || maxY < minY) return null;
+        return new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+
+    private BufferedImage removeAutoBackground(BufferedImage src) {
+        int w = src.getWidth();
+        int h = src.getHeight();
+        BufferedImage dst = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = dst.createGraphics();
+        g2.drawImage(src, 0, 0, null);
+        g2.dispose();
+
+        boolean[][] visited = new boolean[w][h];
+        java.util.Queue<int[]> queue = new java.util.LinkedList<>();
+
+        for (int x = 0; x < w; x++) {
+            enqueueAutoBackground(dst, x, 0, visited, queue);
+            enqueueAutoBackground(dst, x, h - 1, visited, queue);
+        }
+        for (int y = 1; y < h - 1; y++) {
+            enqueueAutoBackground(dst, 0, y, visited, queue);
+            enqueueAutoBackground(dst, w - 1, y, visited, queue);
+        }
+
+        while (!queue.isEmpty()) {
+            int[] px = queue.poll();
+            int cx = px[0];
+            int cy = px[1];
+            dst.setRGB(cx, cy, 0x00000000);
+
+            enqueueAutoBackground(dst, cx - 1, cy, visited, queue);
+            enqueueAutoBackground(dst, cx + 1, cy, visited, queue);
+            enqueueAutoBackground(dst, cx, cy - 1, visited, queue);
+            enqueueAutoBackground(dst, cx, cy + 1, visited, queue);
+        }
+
+        return dst;
+    }
+
+    private void enqueueAutoBackground(BufferedImage img, int x, int y,
+                                       boolean[][] visited,
+                                       java.util.Queue<int[]> queue) {
+        int w = img.getWidth();
+        int h = img.getHeight();
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        if (visited[x][y]) return;
+        visited[x][y] = true;
+
+        int argb = img.getRGB(x, y);
+        int a = (argb >> 24) & 0xFF;
+        int r = (argb >> 16) & 0xFF;
+        int g = (argb >> 8) & 0xFF;
+        int b = argb & 0xFF;
+
+        boolean transparent = a <= 8;
+        boolean nearWhite = r > 190 && g > 190 && b > 190
+                && Math.abs(r - g) < 45
+                && Math.abs(r - b) < 45
+                && Math.abs(g - b) < 45;
+        boolean nearBlack = r < 28 && g < 28 && b < 28;
+        boolean lavenderDots = b > 170 && r > 100 && g < 150;
+
+        if (transparent || nearWhite || nearBlack || lavenderDots) {
+            queue.add(new int[]{x, y});
+        }
     }
 
     protected BufferedImage removeBackgroundFloodFill(BufferedImage src) {
@@ -306,15 +453,15 @@ public abstract class Player {
                 case "left":      currentSprite = walkingLeftFrames[leftAnimFrame];       break;
                 case "downLeft":
                     currentSprite = (walkingDiagonalDownLeftFrames != null
-                                     && walkingDiagonalDownLeftFrames[0] != null)
-                        ? walkingDiagonalDownLeftFrames[diagDownLeftAnimFrame]
-                        : walkingLeftFrames[leftAnimFrame];
+                            && walkingDiagonalDownLeftFrames[0] != null)
+                            ? walkingDiagonalDownLeftFrames[diagDownLeftAnimFrame]
+                            : walkingLeftFrames[leftAnimFrame];
                     break;
                 case "downRight":
                     currentSprite = (walkingDiagonalDownRightFrames != null
-                                     && walkingDiagonalDownRightFrames[0] != null)
-                        ? walkingDiagonalDownRightFrames[diagDownRightAnimFrame]
-                        : walkingRightFrames[rightAnimFrame];
+                            && walkingDiagonalDownRightFrames[0] != null)
+                            ? walkingDiagonalDownRightFrames[diagDownRightAnimFrame]
+                            : walkingRightFrames[rightAnimFrame];
                     break;
             }
         }
@@ -325,16 +472,16 @@ public abstract class Player {
     // ─────────────────────────────────────────────────────────────────────────────
     public void draw(Graphics2D g2, Camera cam) {
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                            RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+                RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         g2.drawImage(currentSprite,
-                     x - cam.offsetX(),
-                     y - cam.offsetY(),
-                     SPRITE_W, SPRITE_H, null);
+                x - cam.offsetX(),
+                y - cam.offsetY(),
+                SPRITE_W, SPRITE_H, null);
     }
 
     public void draw(Graphics2D g2) {
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                            RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+                RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
         g2.drawImage(currentSprite, x, y, SPRITE_W, SPRITE_H, null);
     }
 }

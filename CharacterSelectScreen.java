@@ -2,6 +2,7 @@ import Characters.AyaLogic;
 import Characters.Character;
 import Characters.JakaraLogic;
 import Characters.RonnixLogic;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
@@ -12,96 +13,113 @@ import javax.swing.*;
 
 public class CharacterSelectScreen extends JPanel {
 
-    private GameWindow window;
-    private BufferedImage archerSprite;
-    private BufferedImage ronnixSprite;
-    private BufferedImage jakaraSprite;
+    private final GameWindow window;
 
-    private int cardWidth  = 200;
-    private int cardHeight = 420;
+    private static final Color BG_TOP = new Color(28, 6, 6);
+    private static final Color BG_BOTTOM = new Color(7, 3, 2);
+    private static final Color GOLD = new Color(201, 150, 58);
+    private static final Color GOLD_LIGHT = new Color(240, 192, 96);
+    private static final Color GOLD_DARK = new Color(100, 65, 15);
+    private static final Color PANEL = new Color(18, 9, 5, 218);
+    private static final Color EMBER = new Color(200, 80, 20);
+    private static final Color TEXT = new Color(242, 221, 174);
 
-    private Rectangle archerRect;
-    private Rectangle ronnixRect;
-    private Rectangle jakaraRect;
-    private boolean   archerHovered = false;
-    private boolean   ronnixHovered = false;
-    private boolean   jakaraHovered = false;
+    private static final String[] NAMES = { "Aya", "Ronnix", "Jakara" };
+    private static final String[] DISPLAY_NAMES = { "AYA", "RONNIX", "JAKARA" };
+    private static final String[] CLASSES = { "Archer", "Fighter", "Arcane Mage" };
 
-    private static final Color GOLD        = new Color(201, 150,  58);
-    private static final Color GOLD_LIGHT  = new Color(240, 192,  96);
-    private static final Color GOLD_DARK   = new Color(100,  65,  15);
-    private static final Color STEEL_LIGHT = new Color(180, 200, 220);
-    private static final Color STEEL_DARK  = new Color( 60,  80, 110);
-    // Jakara — arcane violet theme
-    private static final Color MAGE_LIGHT  = new Color(190, 130, 255);
-    private static final Color MAGE_DARK   = new Color( 60,  20, 110);
-
-    private Rectangle backRect;
-    private boolean   backHovered = false;
-
-    // Character stat bars (HP, MP, ATK, DEF) out of 10
     private static final Character[] CHARACTERS = {
-        new AyaLogic(),
-        new RonnixLogic(),
-        new JakaraLogic()
+            new AyaLogic(),
+            new RonnixLogic(),
+            new JakaraLogic()
     };
 
-    private static final String[] CHAR_NAMES = { "AYA", "RONNIX", "JAKARA" };
-    private static final String[] CHAR_CLASS = { "Archer", "Fighter", "Arcane Mage" };
+    private static final String[] PORTRAIT_PATHS = {
+            "images/aya.png",
+            "images/ronnix.png",
+            "images/jakara.png"
+    };
+
+    private static final String[] PREVIEW_PATHS = {
+            "images/aya/ayaBattle.png",
+            "images/ronnix/ronnixBattle.png",
+            "images/jakara/jakaraBattle.png"
+    };
+
+    private final BufferedImage[] portraits = new BufferedImage[3];
+    private final BufferedImage[] previews = new BufferedImage[3];
+    private final Rectangle[] characterRects = new Rectangle[3];
+
+    private Rectangle playRect;
+    private Rectangle backRect;
+    private int selectedIndex = 1;
+    private int hoveredIndex = -1;
+    private boolean playHovered;
+    private boolean backHovered;
 
     public CharacterSelectScreen(GameWindow window) {
         this.window = window;
         setBackground(Color.BLACK);
-
-        // Aya — the Archer character
-        try { archerSprite = preparePortrait(ImageIO.read(new File("images/aya.png"))); }
-        catch (Exception e) { archerSprite = null; }
-
-        // Ronnix — the Fighter character
-        try { ronnixSprite = preparePortrait(ImageIO.read(new File("images/ronnix.png"))); }
-        catch (Exception e) { ronnixSprite = null; }
-
-        // Jakara — the Arcane Mage character
-        try { jakaraSprite = preparePortrait(ImageIO.read(new File("images/jakara.png"))); }
-        catch (Exception e) { jakaraSprite = null; }
-
+        loadImages();
         setupListeners();
+    }
+
+    private void loadImages() {
+        for (int i = 0; i < 3; i++) {
+            portraits[i] = loadPrepared(PORTRAIT_PATHS[i], 148, 148, true);
+            previews[i] = loadPrepared(PREVIEW_PATHS[i], 330, 430, false);
+            if (previews[i] == null) {
+                previews[i] = loadPrepared(PORTRAIT_PATHS[i], 330, 430, false);
+            }
+        }
     }
 
     private void setupListeners() {
         addMouseMotionListener(new MouseMotionAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
-                boolean pA = archerHovered, pR = ronnixHovered, pJ = jakaraHovered, pB = backHovered;
-                archerHovered = archerRect != null && archerRect.contains(e.getPoint());
-                ronnixHovered = ronnixRect != null && ronnixRect.contains(e.getPoint());
-                jakaraHovered = jakaraRect != null && jakaraRect.contains(e.getPoint());
-                backHovered   = backRect   != null && backRect.contains(e.getPoint());
-                if (pA != archerHovered || pR != ronnixHovered || pJ != jakaraHovered || pB != backHovered) repaint();
-                boolean any = archerHovered || ronnixHovered || jakaraHovered || backHovered;
-                setCursor(any ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                              : Cursor.getDefaultCursor());
+                int oldHover = hoveredIndex;
+                boolean oldPlay = playHovered;
+                boolean oldBack = backHovered;
+
+                hoveredIndex = -1;
+                for (int i = 0; i < characterRects.length; i++) {
+                    if (characterRects[i] != null && characterRects[i].contains(e.getPoint())) {
+                        hoveredIndex = i;
+                        selectedIndex = i;
+                        break;
+                    }
+                }
+
+                playHovered = playRect != null && playRect.contains(e.getPoint());
+                backHovered = backRect != null && backRect.contains(e.getPoint());
+
+                boolean hand = hoveredIndex >= 0 || playHovered || backHovered;
+                setCursor(hand ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
+
+                if (oldHover != hoveredIndex || oldPlay != playHovered || oldBack != backHovered) {
+                    repaint();
+                }
             }
         });
 
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if (archerRect != null && archerRect.contains(e.getPoint())) {
-                    window.setSelectedCharacter("Aya");
+                for (int i = 0; i < characterRects.length; i++) {
+                    if (characterRects[i] != null && characterRects[i].contains(e.getPoint())) {
+                        selectedIndex = i;
+                        repaint();
+                        return;
+                    }
+                }
+
+                if (playRect != null && playRect.contains(e.getPoint())) {
+                    window.setSelectedCharacter(NAMES[selectedIndex]);
                     window.showGame();
                     return;
                 }
-                if (ronnixRect != null && ronnixRect.contains(e.getPoint())) {
-                    window.setSelectedCharacter("Ronnix");
-                    window.showGame();
-                    return;
-                }
-                if (jakaraRect != null && jakaraRect.contains(e.getPoint())) {
-                    window.setSelectedCharacter("Jakara");
-                    window.showGame();
-                    return;
-                }
+
                 if (backRect != null && backRect.contains(e.getPoint())) {
                     window.showMainMenu();
                 }
@@ -113,370 +131,411 @@ public class CharacterSelectScreen extends JPanel {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
-        int W = getWidth(), H = getHeight();
+        int W = getWidth();
+        int H = getHeight();
 
-        // Background gradient
-        GradientPaint bg = new GradientPaint(0, 0, new Color(18, 8, 5), 0, H, new Color(6, 3, 10));
-        g2.setPaint(bg);
-        g2.fillRect(0, 0, W, H);
+        drawBackground(g2, W, H);
+        drawHeader(g2, W);
 
-        // Subtle grid
-        g2.setColor(new Color(40, 20, 10, 20));
-        g2.setStroke(new BasicStroke(1f));
-        for (int x = 0; x < W; x += 50) g2.drawLine(x, 0, x, H);
-        for (int y = 0; y < H; y += 50) g2.drawLine(0, y, W, y);
+        int leftW = Math.max(390, (int)(W * 0.38));
+        int rightX = leftW + 34;
+        int rightW = W - rightX - 46;
+        int top = 90;
+        int bottom = H - 42;
 
-        // Vignette
-        RadialGradientPaint vig = new RadialGradientPaint(
-            new Point2D.Float(W / 2f, H / 2f), Math.max(W, H) * 0.75f,
-            new float[]{0.3f, 1f},
-            new Color[]{new Color(0,0,0,0), new Color(0,0,0,220)});
-        g2.setPaint(vig);
-        g2.fillRect(0, 0, W, H);
+        drawSelectedPreview(g2, 42, top, leftW - 78, bottom - top);
+        drawCharacterGrid(g2, rightX, top + 10, rightW, bottom - top - 90);
 
-        // Title
-        g2.setFont(new Font("Serif", Font.BOLD, 36));
-        g2.setColor(GOLD_LIGHT);
-        drawCenteredText(g2, "CHOOSE YOUR CHARACTER", W, 70);
-        g2.setColor(GOLD_DARK);
-        g2.setStroke(new BasicStroke(1f));
-        g2.drawLine((W - 460) / 2, 82, (W + 460) / 2, 82);
+        int buttonY = H - 82;
+        backRect = new Rectangle(28, 24, 138, 42);
+        playRect = new Rectangle(W - 210, buttonY, 164, 54);
 
-        // Cards — three characters side by side, tighter gap to fit at 1280px
-        int gap    = 40;
-        int totalW = 3 * cardWidth + 2 * gap;
-        int startX = (W - totalW) / 2;
-        int cardY  = (H - cardHeight) / 2 - 10;
-
-        archerRect = new Rectangle(startX,                       cardY, cardWidth, cardHeight);
-        ronnixRect = new Rectangle(startX + cardWidth + gap,     cardY, cardWidth, cardHeight);
-        jakaraRect = new Rectangle(startX + 2 * (cardWidth + gap), cardY, cardWidth, cardHeight);
-
-        drawCharacterCard(g2, 0, archerRect, archerSprite, archerHovered, GOLD,       false, false);
-        drawCharacterCard(g2, 1, ronnixRect, ronnixSprite, ronnixHovered, STEEL_LIGHT, true, false);
-        drawCharacterCard(g2, 2, jakaraRect, jakaraSprite, jakaraHovered, MAGE_LIGHT, false, true);
-
-        // Back button
-        int bW = 140, bH = 40;
-        int bX = (W - bW) / 2, bY = H - 70;
-        backRect = new Rectangle(bX, bY, bW, bH);
-        drawSmallButton(g2, "◄  BACK", bX, bY, bW, bH, backHovered);
+        drawBackButton(g2, backRect, backHovered);
+        drawPlayButton(g2, playRect, playHovered);
 
         g2.dispose();
     }
 
-    private void drawCharacterCard(Graphics2D g2, int idx, Rectangle r,
-                                    BufferedImage sprite, boolean hovered,
-                                    Color accent, boolean isRonnix, boolean isJakara) {
-        int x = r.x, y = r.y, w = r.width, h = r.height;
+    private void drawBackground(Graphics2D g2, int W, int H) {
+        GradientPaint bg = new GradientPaint(0, 0, BG_TOP, 0, H, BG_BOTTOM);
+        g2.setPaint(bg);
+        g2.fillRect(0, 0, W, H);
 
-        if (hovered) {
-            g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 35));
-            g2.fillRoundRect(x - 12, y - 12, w + 24, h + 24, 24, 24);
+        g2.setColor(new Color(EMBER.getRed(), EMBER.getGreen(), EMBER.getBlue(), 28));
+        for (int i = 0; i < 120; i++) {
+            int x = (i * 97) % Math.max(W, 1);
+            int y = (i * 53) % Math.max(H, 1);
+            int s = 2 + (i % 4);
+            g2.fillOval(x, y, s, s);
         }
 
-        // Background tint differs per class
-        Color cardBg = isRonnix  ? new Color(15, 10, 25, 220)
-                     : isJakara  ? new Color(10,  5, 22, 230)
-                                 : new Color(30, 15,  5, 220);
-        g2.setColor(cardBg);
-        g2.fillRoundRect(x, y, w, h, 16, 16);
+        RadialGradientPaint emberGlow = new RadialGradientPaint(
+                new Point2D.Float(W * 0.18f, H * 0.78f),
+                Math.max(W, H) * 0.42f,
+                new float[]{0f, 1f},
+                new Color[]{new Color(180, 60, 10, 82), new Color(0, 0, 0, 0)}
+        );
+        g2.setPaint(emberGlow);
+        g2.fillRect(0, 0, W, H);
 
-        // Accent top strip for Jakara
-        if (isJakara) {
-            GradientPaint strip = new GradientPaint(x, y, MAGE_DARK, x + w, y, MAGE_LIGHT);
-            g2.setPaint(strip);
-            g2.fillRoundRect(x, y, w, 10, 16, 16);
-            g2.fillRect(x, y + 6, w, 4);
-        }
+        RadialGradientPaint vignette = new RadialGradientPaint(
+                new Point2D.Float(W / 2f, H / 2f),
+                Math.max(W, H) * 0.75f,
+                new float[]{0.2f, 1f},
+                new Color[]{new Color(0, 0, 0, 0), new Color(0, 0, 0, 205)}
+        );
+        g2.setPaint(vignette);
+        g2.fillRect(0, 0, W, H);
 
-        g2.setColor(hovered ? accent.brighter() : accent.darker());
-        g2.setStroke(new BasicStroke(hovered ? 2.5f : 1.5f));
-        g2.drawRoundRect(x, y, w, h, 16, 16);
-        drawCorners(g2, x, y, w, h, hovered ? accent.brighter() : accent);
-
-        // Sprite or silhouette
-        // Portrait area: OUTPUT_W wide × OUTPUT_H tall, centred in card, top-padded by 10px
-        int portraitAreaW = OUTPUT_W;
-        int portraitAreaH = OUTPUT_H;
-        int spriteX = x + (w - portraitAreaW) / 2;
-        int spriteY = y + 10;
-        if (sprite != null) {
-            // Subtle glow behind portrait
-            if (isJakara) {
-                g2.setColor(new Color(160, 80, 255, 35));
-                g2.fillOval(spriteX - 8, spriteY + portraitAreaH / 2, portraitAreaW + 16, portraitAreaH / 2 + 8);
-            } else if (isRonnix) {
-                g2.setColor(new Color(60, 80, 180, 25));
-                g2.fillOval(spriteX - 8, spriteY + portraitAreaH / 2, portraitAreaW + 16, portraitAreaH / 2 + 8);
-            } else {
-                g2.setColor(new Color(180, 130, 40, 20));
-                g2.fillOval(spriteX - 8, spriteY + portraitAreaH / 2, portraitAreaW + 16, portraitAreaH / 2 + 8);
-            }
-            // Draw portrait directly — background already stripped, no clip needed
-            g2.drawImage(sprite, spriteX, spriteY, portraitAreaW, portraitAreaH, null);
-        } else {
-            drawSilhouette(g2, spriteX, spriteY, Math.min(portraitAreaW, portraitAreaH), isRonnix, isJakara, accent);
-        }
-
-        // Name
-        g2.setFont(new Font("Serif", Font.BOLD, 20));
-        g2.setColor(Color.WHITE);
-        drawCenteredInRect(g2, CHAR_NAMES[idx], x, w, y + portraitAreaH + 26);
-
-        // Class label
-        g2.setFont(new Font("Serif", Font.ITALIC, 13));
-        g2.setColor(accent);
-        drawCenteredInRect(g2, CHAR_CLASS[idx], x, w, y + portraitAreaH + 44);
-
-        // Stat bars
-        String[] statLabels = { "HP", "DEF", "SK1", "SK2", "SK3" };
-
-        Character c = CHARACTERS[idx];
-
-        String[] statValues = {
-            String.valueOf(c.getMaxHp()),
-            String.valueOf(c.getMaxDefense()),
-            c.getSkillDamageRange(1),
-            c.getSkillDamageRange(2),
-            c.getSkillDamageRange(3)
-        };
-        
-        int barAreaY = y + portraitAreaH + 58;
-        int barW = w - 30, barH = 9, barX = x + 15;
-        for (int i = 0; i < statLabels.length; i++) {
-            int by = barAreaY + i * 20;
-
-            g2.setFont(new Font("Monospaced", Font.BOLD, 10));
-            g2.setColor(new Color(180, 160, 120));
-            g2.drawString(statLabels[i], barX, by + barH);
-
-            int valueX = barX + 45;
-
-            g2.setColor(accent);
-            g2.drawString(statValues[i], valueX, by + barH);
-        }
-
-                g2.setFont(new Font("Serif", Font.ITALIC, 12));
-                g2.setColor(hovered ? accent : new Color(120, 100, 60));
-                drawCenteredInRect(g2, "Click to select", x, w, y + h - 10);
-            }
-
-    /**
-     * Draws a stylised placeholder silhouette when no sprite image is found.
-     * Ronnix gets a sword; Archer gets a bow; Jakara gets a staff with an orb.
-     */
-    private void drawSilhouette(Graphics2D g2, int x, int y, int size,
-                                 boolean isRonnix, boolean isJakara, Color accent) {
-        Color body = isRonnix  ? new Color(40, 30, 60)
-                   : isJakara  ? new Color(25, 12, 45)
-                               : new Color(50, 35, 15);
-        g2.setColor(body);
-        // Torso
-        g2.fillRoundRect(x + size/4, y + size/4, size/2, (int)(size*0.55), 10, 10);
-        // Head
-        g2.fillOval(x + size/3, y + 4, size/3, size/3);
-        // Legs
-        g2.fillRect(x + size/4,          y + (int)(size*0.75), size/5, size/4);
-        g2.fillRect(x + (int)(size*0.55), y + (int)(size*0.75), size/5, size/4);
-
-        if (isRonnix) {
-            // Sword blade
-            g2.setColor(STEEL_LIGHT);
-            g2.setStroke(new BasicStroke(3f));
-            g2.drawLine(x + (int)(size*0.72), y + size/5,
-                        x + (int)(size*0.52), y + (int)(size*0.72));
-            // Crossguard
-            g2.setColor(GOLD);
-            g2.fillRect(x + (int)(size*0.56), y + (int)(size*0.36), 16, 4);
-        } else if (isJakara) {
-            // Staff shaft
-            g2.setColor(new Color(120, 70, 200));
-            g2.setStroke(new BasicStroke(3f));
-            g2.drawLine(x + (int)(size*0.75), y + (int)(size*0.85),
-                        x + (int)(size*0.72), y + size/8);
-            // Orb at tip
-            g2.setColor(new Color(200, 140, 255, 200));
-            g2.fillOval(x + (int)(size*0.64), y + 2, 18, 18);
-            g2.setColor(MAGE_LIGHT);
-            g2.setStroke(new BasicStroke(1.5f));
-            g2.drawOval(x + (int)(size*0.64), y + 2, 18, 18);
-            // Arcane sparkles
-            g2.setColor(new Color(220, 180, 255, 160));
-            g2.fillOval(x + (int)(size*0.20), y + (int)(size*0.30), 6, 6);
-            g2.fillOval(x + (int)(size*0.15), y + (int)(size*0.55), 4, 4);
-        } else {
-            // Bow
-            g2.setColor(GOLD_DARK);
-            g2.setStroke(new BasicStroke(2f));
-            g2.drawArc(x + (int)(size*0.68), y + size/5,
-                       (int)(size*0.22), (int)(size*0.55), -90, 180);
-            g2.setColor(new Color(180, 140, 90));
-            g2.setStroke(new BasicStroke(1f));
-            g2.drawLine(x + (int)(size*0.79), y + size/5,
-                        x + (int)(size*0.79), y + (int)(size*0.76));
-        }
-
-        g2.setColor(accent);
-        g2.setStroke(new BasicStroke(1.5f));
-        g2.drawRoundRect(x, y, size, size, 10, 10);
-
-        g2.setFont(new Font("Serif", Font.BOLD | Font.ITALIC, 13));
-        g2.setColor(accent);
-        String tag = isRonnix ? "RONNIX" : isJakara ? "JAKARA" : "AYA";
-        FontMetrics fm = g2.getFontMetrics();
-        g2.drawString(tag, x + (size - fm.stringWidth(tag)) / 2, y + size - 8);
+        g2.setColor(new Color(0, 0, 0, 115));
+        g2.fillRect(0, 0, W, H);
     }
 
-    private void drawSmallButton(Graphics2D g2, String label, int x, int y,
-                                  int w, int h, boolean hovered) {
-        if (hovered) {
-            g2.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 35));
-            g2.fillRoundRect(x - 6, y - 6, w + 12, h + 12, 6, 6);
+    private void drawHeader(Graphics2D g2, int W) {
+        g2.setFont(new Font("Serif", Font.BOLD, 38));
+        String title = "CHOOSE YOUR CHARACTER";
+        FontMetrics fm = g2.getFontMetrics();
+        int x = (W - fm.stringWidth(title)) / 2;
+        g2.setColor(new Color(0, 0, 0, 180));
+        g2.drawString(title, x + 3, 62);
+        g2.setColor(GOLD_LIGHT);
+        g2.drawString(title, x, 60);
+
+        g2.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 130));
+        g2.drawLine(x + 28, 74, x + fm.stringWidth(title) - 28, 74);
+    }
+
+    private void drawSelectedPreview(Graphics2D g2, int x, int y, int w, int h) {
+        Character c = CHARACTERS[selectedIndex];
+        Color accent = accentFor(selectedIndex);
+
+        int platformH = 90;
+        int platformY = y + h - platformH - 92;
+        int platformW = Math.min(w - 34, 430);
+        int platformX = x + (w - platformW) / 2;
+
+        drawPlatform(g2, platformX, platformY, platformW, platformH, accent);
+
+        BufferedImage img = previews[selectedIndex];
+        if (img != null) {
+            int imgW = Math.min(w, 360);
+            int imgH = Math.min(430, platformY - y + 74);
+            int imgX = x + (w - imgW) / 2;
+            int imgY = platformY - imgH + 38;
+            g2.drawImage(img, imgX, imgY, imgW, imgH, null);
         }
-        g2.setColor(hovered ? new Color(80, 45, 10, 220) : new Color(18, 9, 5, 200));
-        g2.fillRect(x, y, w, h);
+
+        int panelX = x + 18;
+        int panelY = platformY + platformH - 8;
+        int panelW = w - 36;
+        int panelH = Math.min(170, y + h - panelY - 4);
+        drawGlassPanel(g2, panelX, panelY, panelW, panelH);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 34));
+        g2.setColor(TEXT);
+        g2.drawString(DISPLAY_NAMES[selectedIndex], panelX + 22, panelY + 42);
+
+        g2.setFont(new Font("Serif", Font.ITALIC, 17));
+        g2.setColor(accent);
+        g2.drawString(CLASSES[selectedIndex], panelX + 24, panelY + 66);
+
+        int statY = panelY + 92;
+        drawStatBars(g2, c, panelX + 20, statY, panelW - 40, accent);
+    }
+
+    private void drawCharacterGrid(Graphics2D g2, int x, int y, int w, int h) {
+        g2.setFont(new Font("Serif", Font.BOLD, 22));
+        g2.setColor(GOLD_LIGHT);
+        g2.drawString("SELECT LEGEND", x + 8, y - 16);
+
+        int cols = 3;
+        int gap = 14;
+        int tile = Math.min(176, Math.max(118, (w - gap * (cols - 1)) / cols));
+        int gridW = cols * tile + (cols - 1) * gap;
+        int startX = x + Math.max(0, (w - gridW) / 2);
+        int startY = y + 18;
+
+        for (int i = 0; i < 3; i++) {
+            int col = i % cols;
+            int row = i / cols;
+            Rectangle r = new Rectangle(startX + col * (tile + gap), startY + row * (tile + gap), tile, tile);
+            characterRects[i] = r;
+            drawCharacterTile(g2, i, r, i == selectedIndex, i == hoveredIndex);
+        }
+
+        int infoY = startY + tile + 36;
+        drawAbilityPanel(g2, x + 8, infoY, w - 16, Math.max(170, h - (infoY - y)), selectedIndex);
+    }
+
+    private void drawCharacterTile(Graphics2D g2, int idx, Rectangle r, boolean selected, boolean hovered) {
+        Color accent = accentFor(idx);
+        int arc = 14;
+
+        if (selected) {
+            g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 70));
+            g2.fillRoundRect(r.x - 8, r.y - 8, r.width + 16, r.height + 16, arc + 8, arc + 8);
+        }
+
+        GradientPaint fill = new GradientPaint(
+                r.x, r.y, selected ? new Color(82, 36, 12) : new Color(31, 14, 8),
+                r.x, r.y + r.height, selected ? new Color(30, 10, 4) : new Color(13, 7, 4)
+        );
+        g2.setPaint(fill);
+        g2.fillRoundRect(r.x, r.y, r.width, r.height, arc, arc);
+
+        g2.setColor(selected ? GOLD_LIGHT : hovered ? GOLD : GOLD_DARK);
+        g2.setStroke(new BasicStroke(selected ? 4f : 2f));
+        g2.drawRoundRect(r.x, r.y, r.width, r.height, arc, arc);
+
+        BufferedImage portrait = portraits[idx];
+        if (portrait != null) {
+            int pad = 12;
+            g2.drawImage(portrait, r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2 - 26, null);
+        }
+
+        g2.setFont(new Font("Serif", Font.BOLD, 16));
+        FontMetrics fm = g2.getFontMetrics();
+        int tx = r.x + (r.width - fm.stringWidth(DISPLAY_NAMES[idx])) / 2;
+        int ty = r.y + r.height - 12;
+        g2.setColor(new Color(0, 0, 0, 180));
+        g2.drawString(DISPLAY_NAMES[idx], tx + 2, ty + 2);
+        g2.setColor(TEXT);
+        g2.drawString(DISPLAY_NAMES[idx], tx, ty);
+    }
+
+    private void drawAbilityPanel(Graphics2D g2, int x, int y, int w, int h, int idx) {
+        drawGlassPanel(g2, x, y, w, h);
+
+        Character c = CHARACTERS[idx];
+        Color accent = accentFor(idx);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 24));
+        g2.setColor(TEXT);
+        g2.drawString(DISPLAY_NAMES[idx], x + 24, y + 36);
+
+        g2.setFont(new Font("Serif", Font.ITALIC, 15));
+        g2.setColor(accent);
+        g2.drawString(CLASSES[idx], x + 24, y + 58);
+
+        int statX = x + 24;
+        int statY = y + 88;
+        drawValueLine(g2, "HP", String.valueOf(c.getMaxHp()), statX, statY, accent);
+        drawValueLine(g2, "DEF", String.valueOf(c.getMaxDefense()), statX, statY + 24, accent);
+        drawValueLine(g2, c.getSkillName(1), c.getSkillDamageRange(1), statX, statY + 58, accent);
+        drawValueLine(g2, c.getSkillName(2), c.getSkillDamageRange(2), statX, statY + 82, accent);
+        drawValueLine(g2, c.getSkillName(3), c.getSkillDamageRange(3), statX, statY + 106, accent);
+    }
+
+    private void drawValueLine(Graphics2D g2, String label, String value, int x, int y, Color accent) {
+        g2.setFont(new Font("Monospaced", Font.BOLD, 14));
+        g2.setColor(new Color(178, 140, 84));
+        g2.drawString(label, x, y);
+        g2.setColor(accent);
+        g2.drawString(value, x + 190, y);
+    }
+
+    private void drawStatBars(Graphics2D g2, Character c, int x, int y, int w, Color accent) {
+        int hpScore = Math.min(10, Math.max(1, c.getMaxHp() / 10));
+        int defScore = Math.min(10, Math.max(1, c.getMaxDefense()));
+        drawMiniBar(g2, "HP", hpScore, x, y, w, accent);
+        drawMiniBar(g2, "DEF", defScore, x, y + 28, w, accent);
+    }
+
+    private void drawMiniBar(Graphics2D g2, String label, int score, int x, int y, int w, Color accent) {
+        g2.setFont(new Font("Monospaced", Font.BOLD, 13));
+        g2.setColor(new Color(186, 146, 84));
+        g2.drawString(label, x, y + 14);
+
+        int blocks = 10;
+        int blockW = Math.max(12, (w - 72) / blocks);
+        int bx = x + 58;
+        for (int i = 0; i < blocks; i++) {
+            g2.setColor(i < score ? accent : new Color(52, 30, 14));
+            g2.fillRoundRect(bx + i * blockW, y + 3, blockW - 3, 14, 4, 4);
+            g2.setColor(new Color(0, 0, 0, 80));
+            g2.drawRoundRect(bx + i * blockW, y + 3, blockW - 3, 14, 4, 4);
+        }
+    }
+
+    private void drawPlatform(Graphics2D g2, int x, int y, int w, int h, Color accent) {
+        g2.setColor(new Color(0, 0, 0, 85));
+        g2.fillOval(x + 18, y + h - 20, w - 36, 30);
+
+        GradientPaint base = new GradientPaint(x, y, new Color(112, 66, 24), x, y + h, new Color(42, 22, 10));
+        g2.setPaint(base);
+        g2.fillRoundRect(x, y + 22, w, h - 22, 18, 18);
+
+        g2.setColor(new Color(166, 118, 58));
+        g2.fillRoundRect(x + 12, y + 8, w - 24, 34, 18, 18);
+
+        g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 165));
+        g2.setStroke(new BasicStroke(4f));
+        g2.drawOval(x + 46, y + 10, w - 92, 34);
+        g2.setStroke(new BasicStroke(1f));
+    }
+
+    private void drawGlassPanel(Graphics2D g2, int x, int y, int w, int h) {
+        g2.setColor(PANEL);
+        g2.fillRoundRect(x, y, w, h, 10, 10);
+        g2.setColor(GOLD_DARK);
+        g2.setStroke(new BasicStroke(1.5f));
+        g2.drawRoundRect(x, y, w, h, 10, 10);
+        drawCorners(g2, x, y, w, h, GOLD);
+        g2.setColor(new Color(GOLD_LIGHT.getRed(), GOLD_LIGHT.getGreen(), GOLD_LIGHT.getBlue(), 28));
+        g2.drawLine(x + 12, y + 9, x + w - 12, y + 9);
+    }
+
+    private void drawBackButton(Graphics2D g2, Rectangle r, boolean hovered) {
+        drawActionButton(g2, "<  BACK", r, hovered);
+    }
+
+    private void drawPlayButton(Graphics2D g2, Rectangle r, boolean hovered) {
+        drawActionButton(g2, "SELECT", r, hovered);
+    }
+
+    private void drawActionButton(Graphics2D g2, String label, Rectangle r, boolean hovered) {
+        if (hovered) {
+            g2.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 38));
+            g2.fillRoundRect(r.x - 7, r.y - 7, r.width + 14, r.height + 14, 8, 8);
+        }
+
+        g2.setColor(hovered ? new Color(80, 40, 10, 220) : new Color(20, 10, 5, 190));
+        g2.fillRect(r.x, r.y, r.width, r.height);
         g2.setColor(hovered ? GOLD_LIGHT : GOLD_DARK);
         g2.setStroke(new BasicStroke(hovered ? 2f : 1.5f));
-        g2.drawRect(x, y, w, h);
-        g2.setFont(new Font("Serif", Font.BOLD, 14));
+        g2.drawRect(r.x, r.y, r.width, r.height);
+        drawCorners(g2, r.x, r.y, r.width, r.height, hovered ? GOLD_LIGHT : GOLD);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 16));
         FontMetrics fm = g2.getFontMetrics();
-        int tx = x + (w - fm.stringWidth(label)) / 2;
-        int ty = y + (h + fm.getAscent() - fm.getDescent()) / 2;
-        g2.setColor(new Color(0, 0, 0, 180)); g2.drawString(label, tx + 2, ty + 2);
-        g2.setColor(hovered ? GOLD_LIGHT : GOLD); g2.drawString(label, tx, ty);
+        int tx = r.x + (r.width - fm.stringWidth(label)) / 2;
+        int ty = r.y + (r.height + fm.getAscent() - fm.getDescent()) / 2;
+        g2.setColor(new Color(0, 0, 0, 185));
+        g2.drawString(label, tx + 2, ty + 2);
+        g2.setColor(hovered ? GOLD_LIGHT : GOLD);
+        g2.drawString(label, tx, ty);
     }
 
     private void drawCorners(Graphics2D g2, int x, int y, int w, int h, Color c) {
         int cs = 10;
-        g2.setColor(c); g2.setStroke(new BasicStroke(2f));
-        g2.drawLine(x, y, x+cs, y);         g2.drawLine(x, y, x, y+cs);
-        g2.drawLine(x+w, y, x+w-cs, y);     g2.drawLine(x+w, y, x+w, y+cs);
-        g2.drawLine(x, y+h, x+cs, y+h);     g2.drawLine(x, y+h, x, y+h-cs);
-        g2.drawLine(x+w, y+h, x+w-cs, y+h); g2.drawLine(x+w, y+h, x+w, y+h-cs);
+        g2.setColor(c);
+        g2.setStroke(new BasicStroke(1.5f));
+        g2.drawLine(x, y, x + cs, y);
+        g2.drawLine(x, y, x, y + cs);
+        g2.drawLine(x + w, y, x + w - cs, y);
+        g2.drawLine(x + w, y, x + w, y + cs);
+        g2.drawLine(x, y + h, x + cs, y + h);
+        g2.drawLine(x, y + h, x, y + h - cs);
+        g2.drawLine(x + w, y + h, x + w - cs, y + h);
+        g2.drawLine(x + w, y + h, x + w, y + h - cs);
     }
 
-    private void drawCenteredText(Graphics2D g2, String text, int W, int y) {
-        FontMetrics fm = g2.getFontMetrics();
-        g2.drawString(text, (W - fm.stringWidth(text)) / 2, y);
+    private Color accentFor(int idx) {
+        return switch (idx) {
+            case 0 -> new Color(255, 190, 70);
+            case 1 -> new Color(225, 86, 42);
+            case 2 -> new Color(221, 157, 72);
+            default -> GOLD;
+        };
     }
 
-    private void drawCenteredInRect(Graphics2D g2, String text, int rx, int rw, int y) {
-        FontMetrics fm = g2.getFontMetrics();
-        g2.drawString(text, rx + (rw - fm.stringWidth(text)) / 2, y);
+    private BufferedImage loadPrepared(String path, int outW, int outH, boolean fillSquare) {
+        try {
+            BufferedImage src = ImageIO.read(new File(path));
+            if (src == null) return null;
+            return prepareImage(src, outW, outH, fillSquare);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
-    // ── Portrait processing ───────────────────────────────────────────────────
-
-    /**
-     * Removes the white/light background via flood-fill, crops to the tight
-     * content bounding box, then places the character anchored to the BOTTOM
-     * of a fixed-size canvas. This ensures all three characters are drawn at
-     * the same visual height and stand on the same baseline inside their card.
-     *
-     * Canvas size: OUTPUT_W × OUTPUT_H (wider than tall so full body fits).
-     */
-    private static final int OUTPUT_W = 160;
-    private static final int OUTPUT_H = 200;
-
-    private BufferedImage preparePortrait(BufferedImage src) {
-        if (src == null) return null;
-
-        // 1. Convert to ARGB
-        BufferedImage argb = new BufferedImage(
-                src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+    private BufferedImage prepareImage(BufferedImage src, int outW, int outH, boolean fillSquare) {
+        BufferedImage argb = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
         Graphics2D tmp = argb.createGraphics();
         tmp.drawImage(src, 0, 0, null);
         tmp.dispose();
 
-        // 2. Remove white / near-white / fringe background
-        removeWhiteBackground(argb);
+        removeBackground(argb);
+        Rectangle bounds = contentBounds(argb);
+        if (bounds == null) return null;
 
-        // 3. Tight-crop to visible content
-        int[] bbox = contentBBox(argb);
-        if (bbox == null) return null;
-        int cx = bbox[0], cy = bbox[1], cw = bbox[2], ch = bbox[3];
-        BufferedImage cropped = argb.getSubimage(cx, cy, cw, ch);
+        BufferedImage cropped = argb.getSubimage(bounds.x, bounds.y, bounds.width, bounds.height);
+        BufferedImage out = new BufferedImage(outW, outH, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = out.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
-        // 4. Scale so the character fills OUTPUT_H in height (preserving aspect ratio)
-        //    then centre horizontally in OUTPUT_W.
-        double scale  = (double) OUTPUT_H / ch;
-        int scaledW   = (int)(cw * scale);
-        int scaledH   = OUTPUT_H;
-        // If too wide, fit by width instead
-        if (scaledW > OUTPUT_W) {
-            scale   = (double) OUTPUT_W / cw;
-            scaledW = OUTPUT_W;
-            scaledH = (int)(ch * scale);
-        }
-
-        // 5. Place on canvas, anchored to the BOTTOM-CENTRE so all characters
-        //    stand on the same line regardless of their different proportions.
-        BufferedImage result = new BufferedImage(OUTPUT_W, OUTPUT_H, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = result.createGraphics();
-        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                            RenderingHints.VALUE_ANTIALIAS_ON);
-        int drawX = (OUTPUT_W - scaledW) / 2;
-        int drawY = OUTPUT_H - scaledH;          // bottom-anchored
-        g2.drawImage(cropped, drawX, drawY, scaledW, scaledH, null);
+        double scale = fillSquare
+                ? Math.min((double)(outW - 12) / cropped.getWidth(), (double)(outH - 28) / cropped.getHeight())
+                : Math.min((double)outW / cropped.getWidth(), (double)outH / cropped.getHeight());
+        int drawW = Math.max(1, (int)Math.round(cropped.getWidth() * scale));
+        int drawH = Math.max(1, (int)Math.round(cropped.getHeight() * scale));
+        int drawX = (outW - drawW) / 2;
+        int drawY = fillSquare ? outH - drawH - 10 : outH - drawH;
+        g2.drawImage(cropped, drawX, drawY, drawW, drawH, null);
         g2.dispose();
-        return result;
+        return out;
     }
 
-    /** Removes white/near-white background in-place via edge flood-fill. */
-    private void removeWhiteBackground(BufferedImage img) {
-        int w = img.getWidth(), h = img.getHeight();
+    private void removeBackground(BufferedImage img) {
+        int w = img.getWidth();
+        int h = img.getHeight();
         boolean[][] visited = new boolean[w][h];
-        java.util.Queue<int[]> queue = new java.util.LinkedList<>();
+        java.util.Queue<Point> queue = new java.util.LinkedList<>();
 
         for (int x = 0; x < w; x++) {
-            enqueuePortrait(img, x, 0,     visited, queue);
-            enqueuePortrait(img, x, h - 1, visited, queue);
+            enqueueBackground(img, x, 0, visited, queue);
+            enqueueBackground(img, x, h - 1, visited, queue);
         }
         for (int y = 1; y < h - 1; y++) {
-            enqueuePortrait(img, 0,     y, visited, queue);
-            enqueuePortrait(img, w - 1, y, visited, queue);
+            enqueueBackground(img, 0, y, visited, queue);
+            enqueueBackground(img, w - 1, y, visited, queue);
         }
 
         while (!queue.isEmpty()) {
-            int[] px = queue.poll();
-            int cx = px[0], cy = px[1];
-            img.setRGB(cx, cy, 0x00000000);
-            int[][] nb = { {cx-1,cy},{cx+1,cy},{cx,cy-1},{cx,cy+1} };
-            for (int[] n : nb) enqueuePortrait(img, n[0], n[1], visited, queue);
+            Point p = queue.poll();
+            img.setRGB(p.x, p.y, 0x00000000);
+            enqueueBackground(img, p.x - 1, p.y, visited, queue);
+            enqueueBackground(img, p.x + 1, p.y, visited, queue);
+            enqueueBackground(img, p.x, p.y - 1, visited, queue);
+            enqueueBackground(img, p.x, p.y + 1, visited, queue);
         }
     }
 
-    private void enqueuePortrait(BufferedImage img, int x, int y,
-                                  boolean[][] visited, java.util.Queue<int[]> queue) {
-        int w = img.getWidth(), h = img.getHeight();
-        if (x < 0 || y < 0 || x >= w || y >= h || visited[x][y]) return;
+    private void enqueueBackground(BufferedImage img, int x, int y, boolean[][] visited, java.util.Queue<Point> queue) {
+        if (x < 0 || y < 0 || x >= img.getWidth() || y >= img.getHeight()) return;
+        if (visited[x][y]) return;
         visited[x][y] = true;
+
         int argb = img.getRGB(x, y);
         int a = (argb >> 24) & 0xFF;
         int r = (argb >> 16) & 0xFF;
-        int g = (argb >>  8) & 0xFF;
-        int b =  argb        & 0xFF;
-        // Transparent, pure white, near-white, and light grey all count as background
-        boolean isBackground = (a < 20) || (r >= 190 && g >= 190 && b >= 190);
-        if (isBackground) queue.add(new int[]{x, y});
+        int g = (argb >> 8) & 0xFF;
+        int b = argb & 0xFF;
+
+        boolean transparent = a < 20;
+        boolean light = r > 188 && g > 188 && b > 188;
+        boolean dark = r < 20 && g < 20 && b < 20;
+        boolean lavender = b > 170 && r > 100 && g < 145;
+
+        if (transparent || light || dark || lavender) {
+            queue.add(new Point(x, y));
+        }
     }
 
-    /**
-     * Returns [x, y, width, height] of the tight bounding box of non-transparent
-     * pixels, or null if the image is completely transparent.
-     */
-    private int[] contentBBox(BufferedImage img) {
-        int w = img.getWidth(), h = img.getHeight();
-        int minX = w, minY = h, maxX = -1, maxY = -1;
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                if (((img.getRGB(x, y) >> 24) & 0xFF) > 20) {
+    private Rectangle contentBounds(BufferedImage img) {
+        int minX = img.getWidth();
+        int minY = img.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+
+        for (int y = 0; y < img.getHeight(); y++) {
+            for (int x = 0; x < img.getWidth(); x++) {
+                int alpha = (img.getRGB(x, y) >> 24) & 0xFF;
+                if (alpha > 20) {
                     if (x < minX) minX = x;
                     if (x > maxX) maxX = x;
                     if (y < minY) minY = y;
@@ -484,14 +543,8 @@ public class CharacterSelectScreen extends JPanel {
                 }
             }
         }
-        if (maxX < minX || maxY < minY) return null;
-        return new int[]{minX, minY, maxX - minX + 1, maxY - minY + 1};
-    }
 
-    private Color lerp(Color a, Color b, float t) {
-        int r  = Math.min(255, (int)(a.getRed()   + (b.getRed()   - a.getRed())   * t));
-        int gr = Math.min(255, (int)(a.getGreen() + (b.getGreen() - a.getGreen()) * t));
-        int bl = Math.min(255, (int)(a.getBlue()  + (b.getBlue()  - a.getBlue())  * t));
-        return new Color(r, gr, bl);
+        if (maxX < minX || maxY < minY) return null;
+        return new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 }

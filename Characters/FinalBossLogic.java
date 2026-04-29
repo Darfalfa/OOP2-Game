@@ -152,6 +152,16 @@ public class FinalBossLogic extends Character {
     }
 
     @Override
+    public int getSkillHorizontalOffset(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> -260;
+            case 2 -> -250;
+            case 3 -> -240;
+            default -> 0;
+        };
+    }
+
+    @Override
     public int getVerticalOffset() {
         return 40;
     }
