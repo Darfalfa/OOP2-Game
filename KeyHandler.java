@@ -21,7 +21,7 @@ public class KeyHandler implements KeyListener {
     public void keyPressed(KeyEvent e) {
         int code = e.getKeyCode();
 
-        if (gameScreen.isDialogueOpen()) return;
+        if (gameScreen.isDialogueOpen() || gameScreen.isStoryOpen()) return;
 
         if (code == KeyEvent.VK_W) upPressed = true;
         if (code == KeyEvent.VK_S) downPressed = true;

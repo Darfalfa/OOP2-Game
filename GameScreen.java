@@ -17,6 +17,15 @@ public class GameScreen extends JPanel implements Runnable {
     public static final int SCREEN_WIDTH  = GameWindow.WIDTH;
     public static final int SCREEN_HEIGHT = GameWindow.HEIGHT;
 
+    //story
+    private StoryManager storyManager = new StoryManager();
+
+    private String currentStory = "";
+    private boolean storyOpen = false;
+    private boolean[] storyTriggered = new boolean[11];
+    private boolean showWensAfterStory = false;
+    private boolean showKhaiAfterStory = false;
+
     // tile settings
     final int originalTileSize = 16;
     final int scale = 3;
@@ -198,6 +207,11 @@ public class GameScreen extends JPanel implements Runnable {
             @Override
             public void mouseClicked(MouseEvent e) {
                 Point p = e.getPoint();
+                if (storyOpen) {
+                    closeStory();
+                    return;
+                }
+
                 if (wensDialogueOpen) {
                     wensDialogueOpen = false;
                     return;
@@ -312,6 +326,35 @@ public class GameScreen extends JPanel implements Runnable {
             }
         });
 
+    }
+
+    public void showStory(String id) {
+
+        wensDialogueOpen = false;
+        khaiDialogueOpen = false;
+        shopDialogueOpen = false;
+
+        currentStory = storyManager.getStory(id);
+        storyOpen = true;
+    }
+
+    public boolean isStoryOpen() {
+        return storyOpen;
+    }
+
+    public void closeStory() {
+        storyOpen = false;
+        currentStory = "";
+
+        if (showWensAfterStory) {
+            wensDialogueOpen = true;
+            showWensAfterStory = false;
+        }
+
+        if (showKhaiAfterStory) {
+            khaiDialogueOpen = true;
+            showKhaiAfterStory = false;
+        }
     }
 
     public void setSelectedCharacter(String name) {
@@ -470,13 +513,23 @@ public class GameScreen extends JPanel implements Runnable {
         if (won) {
             if (isBoss(defeated.character)) {
                 enemies.remove(defeated);
+
+                if (defeated.character instanceof FinalBossLogic && !storyTriggered[10]) {
+                    showStory("FINAL_BOSS_AFTER");
+                    storyTriggered[10] = true;
+                }
             } else {
                 defeated.defeated = true;
                 defeated.respawnTimer = 300;
             }
 
-            if (!wensDialogueSeen && playerCharacter != null && playerCharacter.getLevel() >= 4) {
-                wensDialogueOpen = true;
+            if (!wensDialogueSeen && playerCharacter != null && playerCharacter.getLevel() >= 4 && !isBoss(defeated.character)) {
+                if (storyOpen) {
+                    showWensAfterStory = true;
+                } else {
+                    wensDialogueOpen = true;
+                }
+
                 wensDialogueSeen = true;
             }
         } else {
@@ -562,6 +615,7 @@ public class GameScreen extends JPanel implements Runnable {
         }
 
         if (playerCharacter != null && playerCharacter.getLevel() != lastPlayerLevel) {
+
             lastPlayerLevel = playerCharacter.getLevel();
 
             bossSpawned = false;
@@ -569,13 +623,43 @@ public class GameScreen extends JPanel implements Runnable {
 
             int lvl = playerCharacter.getLevel();
 
+            if (lvl == 1 && !storyTriggered[1]) {
+                showStory("WORLD_1_START");
+                storyTriggered[1] = true;
+            }
+
+            if (lvl == 4 && !storyTriggered[4]) {
+                showStory("WORLD_2_START");
+                storyTriggered[4] = true;
+            }
+
+            if (lvl == 7 && !storyTriggered[7]) {
+                showStory("WORLD_3_START");
+                storyTriggered[7] = true;
+            }
+
             if (!wensDialogueSeen && lvl >= 4) {
-                wensDialogueOpen = true;
+                if (storyOpen) {
+                    showWensAfterStory = true;
+                } else {
+                    wensDialogueOpen = true;
+                }
+
                 wensDialogueSeen = true;
             }
 
+            if (lvl == 9 && !storyTriggered[9]) {
+                showStory("FINAL_BOSS_BEFORE");
+                storyTriggered[9] = true;
+            }
+
             if ((lvl == 3 || lvl == 6 || lvl == 9) && !khaiDialogueTriggered[lvl]) {
-                khaiDialogueOpen = true;
+                if (storyOpen) {
+                    showKhaiAfterStory = true;
+                } else {
+                    khaiDialogueOpen = true;
+                }
+
                 khaiDialogueTriggered[lvl] = true;
             }
         }
@@ -585,29 +669,25 @@ public class GameScreen extends JPanel implements Runnable {
 
         for (Enemy enemy : enemies) {
 
-            // ===== RESPAWN LOGIC =====
             if (enemy.defeated) {
-
                 enemy.respawnTimer--;
 
                 if (enemy.respawnTimer <= 0) {
-
                     enemy.defeated = false;
-
-                    // restore enemy stats
                     enemy.character.restoreStats();
 
-                    // respawn in random location (not near player, inside world bounds)
                     int margin = 200;
-                    int spawnW = Math.max(1, worldWidth  - margin * 2 - Enemy.W);
+                    int spawnW = Math.max(1, worldWidth - margin * 2 - Enemy.W);
                     int spawnH = Math.max(1, worldHeight - margin * 2 - Enemy.H);
                     int attempts = 0;
+
                     do {
                         enemy.x = margin + (int)(Math.random() * spawnW);
                         enemy.y = margin + (int)(Math.random() * spawnH);
-                        // Clamp to valid world bounds just in case
-                        enemy.x = Math.max(0, Math.min(enemy.x, worldWidth  - Enemy.W));
+
+                        enemy.x = Math.max(0, Math.min(enemy.x, worldWidth - Enemy.W));
                         enemy.y = Math.max(0, Math.min(enemy.y, worldHeight - Enemy.H));
+
                         attempts++;
                     } while (Math.hypot(enemy.x - player.x, enemy.y - player.y) < 250 && attempts < 100);
                 }
@@ -615,7 +695,6 @@ public class GameScreen extends JPanel implements Runnable {
                 continue;
             }
 
-            // ===== NORMAL BEHAVIOR =====
             if (!isBoss(enemy.character)) {
                 enemy.update();
             }
@@ -630,11 +709,14 @@ public class GameScreen extends JPanel implements Runnable {
 
         blinkTimer++;
 
-        if (blinkTimer > 120) { // every ~2 seconds
+        if (blinkTimer > 120) {
             makoBlink = !makoBlink;
             blinkTimer = 0;
         }
-        if (shopFeedbackTimer > 0) shopFeedbackTimer--;
+
+        if (shopFeedbackTimer > 0) {
+            shopFeedbackTimer--;
+        }
     }
 
     private boolean isBoss(Character character) {
@@ -764,11 +846,11 @@ public class GameScreen extends JPanel implements Runnable {
             drawShopDialogue(g2);
         }
 
-        if (wensDialogueOpen) {
+        if (wensDialogueOpen && !storyOpen) {
             drawWensDialogue(g2);
         }
 
-        if (khaiDialogueOpen) {
+        if (khaiDialogueOpen && !storyOpen) {
             drawKhaiDialogue(g2);
         }
 
@@ -781,7 +863,40 @@ public class GameScreen extends JPanel implements Runnable {
             drawInfoWindow(g2);
         }
 
+        if (storyOpen) {
+            drawStoryBox(g2);
+        }
+
         g2.dispose();
+    }
+
+    private void drawStoryBox(Graphics2D g2) {
+
+        int w = 700;
+        int padding = 24;
+        int maxTextWidth = w - padding * 2;
+
+        g2.setFont(new Font("Serif", Font.PLAIN, 16));
+        FontMetrics fm = g2.getFontMetrics();
+
+        int textHeight = measureWrappedText(g2, currentStory, maxTextWidth);
+        int h = textHeight + padding * 2 + 25;
+
+        int x = (getWidth() - w) / 2;
+        int y = getHeight() - h - 40;
+
+        g2.setColor(new Color(0, 0, 0, 220));
+        g2.fillRoundRect(x, y, w, h, 20, 20);
+
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(2));
+        g2.drawRoundRect(x, y, w, h, 20, 20);
+
+        g2.setColor(Color.WHITE);
+        drawWrappedText(g2, currentStory, x + padding, y + padding + fm.getAscent(), maxTextWidth);
+
+        g2.setFont(new Font("Serif", Font.ITALIC, 12));
+        g2.drawString("Click to continue", x + w - 140, y + h - 12);
     }
 
     private void drawShopDialogue(Graphics2D g2) {
@@ -1249,7 +1364,7 @@ public class GameScreen extends JPanel implements Runnable {
                 String testLine = line + word + " ";
                 int testWidth = fm.stringWidth(testLine);
 
-                if (testWidth > maxWidth) {
+                if (testWidth > maxWidth && !line.isEmpty()) {
                     g2.drawString(line, x, y);
                     line = word + " ";
                     y += lineHeight;
