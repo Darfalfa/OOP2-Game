@@ -14,7 +14,7 @@ public class DungeonManager {
     }
 
     public int checkDungeonEntry(int world, Rectangle playerBox) {
-        for (int i = 1; i <= 2; i++) {
+        for (int i = 1; i <= 3; i++) {
             DungeonData d = getDungeon(world, i);
             if (d == null) continue;
 
@@ -34,9 +34,9 @@ public class DungeonManager {
 
     private void loadDungeons() {
         dungeons.put("1-1", new DungeonData(
-                "tiles/world1/W1_D1.png", "maps/W1_D1.tmx",
-                1500, 1256,
-                1450, 1370, 120, 40,
+                "tiles/world1/World1_D1.png", "maps/World1_D1.tmx",
+                950, 500,
+                902, 880, 120, 40,
                 660, 1430,
                 660, 1380, 40, 40   // entrance
         ));
@@ -44,20 +44,30 @@ public class DungeonManager {
         dungeons.put("1-2", new DungeonData(
                 "tiles/world1/W1_D2.png", "maps/W1_D2.tmx",
 
-                950, 1000,
-                1516, 1334, 100, 50,  // Exit area
+                950, 764,
+                950, 900, 100, 50,  // Exit area
 
                 2914, 496,  // Correct return position in the world map
                 2968, 450, 40, 40   // Entrance in world
         ));
 
-        dungeons.put("2-1", new DungeonData(
-                "tiles/world2/W2_D1.png", "maps/W2_D1.tmx",
-                1526, 1172, //spawned inside
-                1526, 1288, 100, 50,  // Exit
-                800, 986,  // spawned outside
-                804, 832, 40, 40   // Entrance
+                dungeons.put("1-3", new DungeonData(
+                "tiles/world1/World1_D3.png", "maps/World1_D3.tmx",
+
+                1046, 1100,
+                1046, 1250, 100, 50,  // Exit area
+
+             684, 2649,  // spawned outside
+            684, 2592, 40, 40   // Entrance
         ));
+
+        // dungeons.put("2-1", new DungeonData(
+        //         "tiles/world2/W2_D1.png", "maps/W2_D1.tmx",
+        //         1526, 1172, //spawned inside
+        //         1526, 1288, 100, 50,  // Exit
+        //         684, 2649,  // spawned outside
+        //         684, 2592, 40, 40   // Entrance
+        // ));
     }
 
     public DungeonData getDungeon(int world, int dungeonNumber) {
