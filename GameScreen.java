@@ -25,6 +25,13 @@ public class GameScreen extends JPanel implements Runnable {
     // world settings
     private DungeonManager dungeonManager;
 
+    private static final String WORLD_1_MUSIC = "world1.wav";
+    private static final String WORLD_2_MUSIC = "world2.wav";
+    private static final String WORLD_3_MUSIC = "World3_opt3.wav";
+    private static final String FINAL_BOSS_MAP_MUSIC = "World3_opt1.wav";
+    private static final String BATTLE_MUSIC = "World3_opt2.wav";
+    private static final String ENDING_MUSIC = "World2_opt2.wav";
+
     private int currentWorld = 1;
     private String currentMusic = "";
 
@@ -458,7 +465,7 @@ public class GameScreen extends JPanel implements Runnable {
         if (world == 2) {
             mapBackground.loadMap("tiles/world2/map2.png");
             collisionManager = new CollisionManager("maps/Detailed_Map2_Collision.tmx");
-            playMusic("world2.wav"); //placeholder
+            playMusic(WORLD_2_MUSIC);
 
             player.x = 800;
             player.y = 982;
@@ -467,7 +474,7 @@ public class GameScreen extends JPanel implements Runnable {
         if (world == 3) {
             mapBackground.loadMap("tiles/world3/map3.png");
             collisionManager = new CollisionManager("maps/Detailed_Map3_Collision.tmx");
-            playMusic("world1.wav"); //placeholder
+            playMusic(WORLD_3_MUSIC);
 
             player.x = 3024;
             player.y = 1584;
@@ -485,6 +492,22 @@ public class GameScreen extends JPanel implements Runnable {
         }
 
         repaint();
+    }
+
+    private void resumeExplorationMusic() {
+        if (playerCharacter != null &&
+                isMonsterClearLevel() &&
+                bossSpawned &&
+                !isCurrentBossDefeated()) {
+            playMusic(FINAL_BOSS_MAP_MUSIC);
+            return;
+        }
+
+        switch (currentWorld) {
+            case 1 -> playMusic(WORLD_1_MUSIC);
+            case 2 -> playMusic(WORLD_2_MUSIC);
+            case 3 -> playMusic(WORLD_3_MUSIC);
+        }
     }
 
     private void switchToDungeon(int dungeonNumber) {
@@ -572,7 +595,7 @@ public class GameScreen extends JPanel implements Runnable {
             setSelectedCharacter(selectedCharacter);
         }
 
-        playMusic("world1.wav");
+        playMusic(WORLD_1_MUSIC);
 
         player.x = worldWidth / 2;
         player.y = worldHeight / 2;
@@ -664,6 +687,31 @@ public class GameScreen extends JPanel implements Runnable {
         enemies.add(new Enemy(x, y, boss, this));
     }
 
+    private Point findNearestClearEnemySpawn(int preferredX, int preferredY) {
+        if (!isTileCollision(preferredX, preferredY, Enemy.W, Enemy.H)) {
+            return new Point(preferredX, preferredY);
+        }
+
+        int step = tileSize;
+
+        for (int radius = step; radius <= step * 12; radius += step) {
+            for (int dx = -radius; dx <= radius; dx += step) {
+                for (int dy = -radius; dy <= radius; dy += step) {
+                    if (Math.abs(dx) != radius && Math.abs(dy) != radius) continue;
+
+                    int x = preferredX + dx;
+                    int y = preferredY + dy;
+
+                    if (!isTileCollision(x, y, Enemy.W, Enemy.H)) {
+                        return new Point(x, y);
+                    }
+                }
+            }
+        }
+
+        return new Point(player.x + tileSize * 5, player.y - tileSize * 3);
+    }
+
     private void spawnSpecialLevelEnemy() {
 
         if (bossSpawned) return;
@@ -675,10 +723,13 @@ public class GameScreen extends JPanel implements Runnable {
         switch (level) {
             case 3 -> spawnBoss(new NoctyxLogic(), 200, 0);
             case 6 -> spawnBoss(new BloodmancerLogic(), -200, 0);
-            case 9 -> spawnBoss(new FinalBossLogic(), 0, -200);
+            case 9 -> {
+                spawnBoss(new FinalBossLogic(), 0, -200);
+            }
         }
 
         bossSpawned = true;
+        playMusic(FINAL_BOSS_MAP_MUSIC);
     }
 
     private boolean isMonsterClearLevel() {
@@ -686,6 +737,14 @@ public class GameScreen extends JPanel implements Runnable {
 
         int level = playerCharacter.getLevel();
         return level == 3 || level == 6 || level == 9;
+    }
+
+    private boolean isCurrentBossDefeated() {
+        int level = playerCharacter.getLevel();
+
+        return (level == 3 && storyTriggered[4]) ||
+                (level == 6 && storyTriggered[7]) ||
+                (level == 9 && storyTriggered[10]);
     }
 
     public void onBattleEnd(Enemy defeated, boolean won) {
@@ -706,6 +765,7 @@ public class GameScreen extends JPanel implements Runnable {
                     enemies.clear();
                     bossSpawned = true;
 
+                    playMusic(ENDING_MUSIC);
                     showStory("FINAL_BOSS_AFTER");
                     storyTriggered[10] = true;
                     endingChoiceOpen = true;
@@ -722,6 +782,10 @@ public class GameScreen extends JPanel implements Runnable {
             if (navigatingToMenu) return; // player clicked Main Menu — don't override it
 
             window.showGameScreen();
+
+            if (!(won && defeated.character instanceof FinalBossLogic)) {
+                resumeExplorationMusic();
+            }
 
             GameScreen.this.requestFocusInWindow();
 
@@ -810,6 +874,7 @@ public class GameScreen extends JPanel implements Runnable {
                 enemies.clear();
                 bossSpawned = true;
 
+                playMusic(ENDING_MUSIC);
                 showStory("FINAL_BOSS_AFTER");
                 storyTriggered[10] = true;
                 endingChoiceOpen = true;
@@ -959,6 +1024,7 @@ public class GameScreen extends JPanel implements Runnable {
     private void triggerBattle(Enemy enemy) {
         inBattle = true;
         stopGame();
+        playMusic(BATTLE_MUSIC);
 
         Character battleEnemy = enemy.character;
 
