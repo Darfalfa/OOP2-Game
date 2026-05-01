@@ -80,9 +80,12 @@ public class JakaraLogic extends Character {
                 int max2 = (int)(25 * multiplier);
                 return min2 + " - " + max2;
             case 3:
-                int min3 = (int)((32 * multiplier) + (4 * multiplier));
-                int max3 = (int)((40 * multiplier) + (4 * multiplier));
-                return min3 + " - " + max3 + " + 4";
+                int min3 = (int)((32 * multiplier));
+                int max3 = (int)((40 * multiplier));
+
+                int bonusDamage = (int)(4 * multiplier);
+
+                return min3 + " - " + max3 + " + " + bonusDamage;
             default:
                 return "0";
         }

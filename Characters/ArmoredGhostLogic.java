@@ -82,8 +82,8 @@ public class ArmoredGhostLogic extends Character {
                 int max2 = (int)(22 * multiplier);
                 return min2 + " - " + max2;
             case 3:
-                int min3 = (int)((28 * multiplier) + (3 * multiplier));
-                int max3 = (int)((34 * multiplier) + (3 * multiplier));
+                int min3 = (int)((28 * multiplier) + (3));
+                int max3 = (int)((34 * multiplier) + (3));
                 return min3 + " - " + max3 + " + 2";
             default:
                 return "0";

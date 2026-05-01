@@ -76,14 +76,20 @@ public class AyaLogic extends Character {
                 int min1 = (int)(7 * multiplier);
                 int max1 = (int)(16 * multiplier);
                 return min1 + " - " + max1;
+
             case 2:
                 int min2 = (int)(19 * multiplier);
                 int max2 = (int)(24 * multiplier);
                 return min2 + " - " + max2;
+
             case 3:
-                int min3 = (int)((27 * multiplier) + (3 * multiplier));
-                int max3 = (int)((39 * multiplier) + (3 * multiplier));
-                return min3 + " - " + max3 + " + 3";
+                int min3 = (int)((27 * multiplier));
+                int max3 = (int)((39 * multiplier));
+
+                int bonusDamage = (int)(2 * multiplier);
+
+                return min3 + " - " + max3 + " + " + bonusDamage;
+
             default:
                 return "0";
         }

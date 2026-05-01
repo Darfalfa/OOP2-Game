@@ -83,9 +83,12 @@ public class RonnixLogic extends Character {
                 int max2 = (int)(24 * multiplier);
                 return min2 + " - " + max2;
             case 3:
-                int min3 = (int)((30 * multiplier) + (3 * multiplier));
-                int max3 = (int)((38 * multiplier) + (3 * multiplier));
-                return min3 + " - " + max3 + " + 3";
+                int min3 = (int)((30 * multiplier));
+                int max3 = (int)((38 * multiplier));
+
+                int bonusDamage = (int)(3 * multiplier);
+
+                return min3 + " - " + max3 + " + " + bonusDamage;
             default:
                 return "0";
         }
