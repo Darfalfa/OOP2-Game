@@ -13,6 +13,7 @@ import javax.swing.*;
 public class GameScreen extends JPanel implements Runnable {
 
     private GameWindow window;
+    private int spawnFreezeFrames = 0;
 
     public static final int SCREEN_WIDTH  = GameWindow.WIDTH;
     public static final int SCREEN_HEIGHT = GameWindow.HEIGHT;
@@ -504,6 +505,14 @@ public class GameScreen extends JPanel implements Runnable {
         player.x = dungeon.enterX;
         player.y = dungeon.enterY;
 
+        keyH.upPressed = false;
+        keyH.downPressed = false;
+        keyH.leftPressed = false;
+        keyH.rightPressed = false;
+
+        spawnFreezeFrames = 2;
+        requestFocusInWindow();
+
         worldWidth = mapBackground.worldWidth;
         worldHeight = mapBackground.worldHeight;
         camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
@@ -511,17 +520,20 @@ public class GameScreen extends JPanel implements Runnable {
         enemies.clear();
     }
 
-    private void switchToWorld() {
-        DungeonData dungeon = dungeonManager.getDungeon(
-                currentWorld,
-                dungeonManager.getCurrentDungeon()
-        );
+        private void switchToWorld() {
+            DungeonData dungeon = dungeonManager.getDungeon(
+                    currentWorld,
+                    dungeonManager.getCurrentDungeon()
+            );
 
-        dungeonManager.exitDungeon();
+            dungeonManager.exitDungeon();
 
-        switchWorld(currentWorld);
+            switchWorld(currentWorld);
 
-        if (dungeon != null) {
+            keyH.upPressed = false;
+            keyH.downPressed = false;
+            keyH.leftPressed = false;
+            keyH.rightPressed = false;
 
             player.x = dungeon.returnX;
             player.y = dungeon.returnY;
@@ -529,12 +541,12 @@ public class GameScreen extends JPanel implements Runnable {
             Rectangle playerBox = new Rectangle(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
 
             Rectangle exitArea = dungeonManager.getExitRect(currentWorld, dungeonManager.getCurrentDungeon());
+
             if (exitArea != null && playerBox.intersects(exitArea)) {
                 player.x = exitArea.x;
                 player.y = exitArea.y;
             }
         }
-    }
 
     public void setSelectedCharacter(String name) {
         this.selectedCharacter = name;
@@ -791,6 +803,17 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     private void update() {
+                if (spawnFreezeFrames > 0) {
+            spawnFreezeFrames--;
+
+            keyH.upPressed = false;
+            keyH.downPressed = false;
+            keyH.leftPressed = false;
+            keyH.rightPressed = false;
+
+            camera.update(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
+            return;
+        }
         if (creditsOpen) return;
 
         if (inBattle) return;
@@ -1059,9 +1082,10 @@ public class GameScreen extends JPanel implements Runnable {
         return storyOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
     }
 
-    public void toggleCollisionDebug() {
-        showCollisionDebug = !showCollisionDebug;
-    }
+        public void toggleCollisionDebug() {
+            showCollisionDebug = !showCollisionDebug;
+            repaint();
+        }
 
     private void drawCollisionDebug(Graphics2D g2) {
         if (!showCollisionDebug || collisionManager == null) {
@@ -1074,6 +1098,7 @@ public class GameScreen extends JPanel implements Runnable {
         int mapRows = collisionManager.getMapRows();
 
         g2.setColor(new Color(255, 0, 0, 100)); // Red with transparency
+        g2.setStroke(new BasicStroke(1));
 
         for (int col = 0; col < mapCols; col++) {
             for (int row = 0; row < mapRows; row++) {
@@ -1083,10 +1108,28 @@ public class GameScreen extends JPanel implements Runnable {
 
                     int screenX = worldX - camera.offsetX();
                     int screenY = worldY - camera.offsetY();
-                                        
+                    
                     // Only draw if visible on screen
-                    if (screenX + tileSize > 0 && screenX < getWidth() &&
-                        screenY + tileSize > 0 && screenY < getHeight()) {
+                    if (!(screenX + tileSize > 0 && screenX < getWidth() &&
+                        screenY + tileSize > 0 && screenY < getHeight())) {
+                        continue;
+                    }
+                    
+                    // Try to get specific collision shapes for this tile
+                    java.util.List<java.awt.Shape> shapes = collisionManager.getCollisionShapesAtTile(col, row);
+                    
+                    if (shapes != null && !shapes.isEmpty()) {
+                        // Draw the actual collision shapes
+                        for (java.awt.Shape shape : shapes) {
+                            // Translate shape to screen coordinates
+                            java.awt.geom.AffineTransform at = new java.awt.geom.AffineTransform();
+                            at.translate(screenX, screenY);
+                            java.awt.Shape transformedShape = at.createTransformedShape(shape);
+                            g2.draw(transformedShape);
+                            g2.fill(transformedShape);
+                        }
+                    } else {
+                        // Fallback: draw full tile rectangle if no custom shapes
                         g2.fillRect(screenX, screenY, tileSize, tileSize);
                     }
                 }

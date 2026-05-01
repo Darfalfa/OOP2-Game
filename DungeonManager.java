@@ -44,7 +44,7 @@ public class DungeonManager {
         dungeons.put("1-2", new DungeonData(
                 "tiles/world1/W1_D2.png", "maps/W1_D2.tmx",
 
-                1380, 1246,
+                950, 1000,
                 1516, 1334, 100, 50,  // Exit area
 
                 2914, 496,  // Correct return position in the world map
