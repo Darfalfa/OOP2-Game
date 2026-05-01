@@ -28,6 +28,11 @@ public class KeyHandler implements KeyListener {
         if (code == KeyEvent.VK_A) leftPressed = true;
         if (code == KeyEvent.VK_D) rightPressed = true;
 
+        // Toggle collision debug visualization with "-" key
+        if (code == KeyEvent.VK_MINUS) {
+            gameScreen.toggleCollisionDebug();
+        }
+
         gameScreen.handleShopInput(code);
 
         if (code == KeyEvent.VK_E) {

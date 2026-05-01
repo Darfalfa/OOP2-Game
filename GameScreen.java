@@ -34,6 +34,7 @@ public class GameScreen extends JPanel implements Runnable {
     int worldHeight;
 
     private CollisionManager collisionManager;
+    private boolean showCollisionDebug = false;
 
     private boolean inDungeon = false;
 
@@ -1058,6 +1059,41 @@ public class GameScreen extends JPanel implements Runnable {
         return storyOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
     }
 
+    public void toggleCollisionDebug() {
+        showCollisionDebug = !showCollisionDebug;
+    }
+
+    private void drawCollisionDebug(Graphics2D g2) {
+        if (!showCollisionDebug || collisionManager == null) {
+            return;
+        }
+
+        boolean[][] blocked = collisionManager.getBlockedTiles();
+        int tileSize = collisionManager.getTileSize();
+        int mapCols = collisionManager.getMapCols();
+        int mapRows = collisionManager.getMapRows();
+
+        g2.setColor(new Color(255, 0, 0, 100)); // Red with transparency
+
+        for (int col = 0; col < mapCols; col++) {
+            for (int row = 0; row < mapRows; row++) {
+                if (blocked[col][row]) {
+                    int worldX = col * tileSize;
+                    int worldY = row * tileSize;
+
+                    int screenX = worldX - camera.offsetX();
+                    int screenY = worldY - camera.offsetY();
+                                        
+                    // Only draw if visible on screen
+                    if (screenX + tileSize > 0 && screenX < getWidth() &&
+                        screenY + tileSize > 0 && screenY < getHeight()) {
+                        g2.fillRect(screenX, screenY, tileSize, tileSize);
+                    }
+                }
+            }
+        }
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -1078,6 +1114,8 @@ public class GameScreen extends JPanel implements Runnable {
         if (player != null) {
             player.draw(g2, camera);
         }
+
+        drawCollisionDebug(g2);
 
         drawHUD(g2);
 

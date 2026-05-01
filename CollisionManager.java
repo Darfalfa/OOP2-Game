@@ -153,6 +153,22 @@ public class CollisionManager {
         return false;
     }
 
+    public boolean[][] getBlockedTiles() {
+        return blocked;
+    }
+
+    public int getTileSize() {
+        return tileSize;
+    }
+
+    public int getMapCols() {
+        return mapCols;
+    }
+
+    public int getMapRows() {
+        return mapRows;
+    }
+
     private void loadEmbeddedTilesetCollision(Element tileset, int firstgid) {
         NodeList tiles = tileset.getElementsByTagName("tile");
 
