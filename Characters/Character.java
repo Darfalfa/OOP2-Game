@@ -215,9 +215,7 @@ abstract public class Character {
 
     public void gainXp(int amount) {
         currentXp += amount;
-
-        while (currentXp >= nextLevelXp) {
-            currentXp -= nextLevelXp;
+        if (currentXp >= nextLevelXp) {
             levelUp();
         }
     }
@@ -237,6 +235,7 @@ abstract public class Character {
         level++;
         recalcStats();
         hp = maxHp;
+        currentXp = 0; // always start fresh at each level
     }
 
     public int takeDamage(int dmg) {
