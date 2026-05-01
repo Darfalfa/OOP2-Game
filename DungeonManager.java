@@ -50,6 +50,14 @@ public class DungeonManager {
                 2914, 496,  // Correct return position in the world map
                 2968, 450, 40, 40   // Entrance in world
         ));
+
+        dungeons.put("2-1", new DungeonData(
+                "tiles/world2/W2_D1.png", "maps/W2_D1.tmx",
+                1526, 1172, //spawned inside
+                1526, 1288, 100, 50,  // Exit
+                800, 986,  // spawned outside
+                804, 832, 40, 40   // Entrance
+        ));
     }
 
     public DungeonData getDungeon(int world, int dungeonNumber) {
