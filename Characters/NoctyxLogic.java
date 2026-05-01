@@ -57,13 +57,12 @@ public class NoctyxLogic extends Character {
         }
     }
 
-    //placeholder
     @Override
     public String getSkillSfx(int skillNumber) {
         return switch (skillNumber) {
-            case 1 -> "Ronnix_SwordSlash.wav";
-            case 2 -> "Ronnix_DeathThrust.wav";
-            case 3 -> "Ronnix_DivineStrike.wav";
+            case 1 -> "B1_V1.wav";
+            case 2 -> "B1_V2.wav";
+            case 3 -> "B1_V3.wav";
             default -> null;
         };
     }

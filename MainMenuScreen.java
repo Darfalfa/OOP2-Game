@@ -38,7 +38,7 @@ public class MainMenuScreen extends JPanel {
 
         // Load background image
         try {
-            background = ImageIO.read(new File("images/startBackround.png"));
+            background = ImageIO.read(new File("images/titleBG.png"));
         } catch (IOException e) {
             background = null; // will fall back to painted background
         }

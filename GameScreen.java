@@ -23,16 +23,47 @@ public class GameScreen extends JPanel implements Runnable {
     public final int tileSize = originalTileSize * scale; // 48
 
     // world settings
+    private DungeonManager dungeonManager;
+
+    private int currentWorld = 1;
+    private String currentMusic = "";
+
     public int maxWorldCol = 50;
     public int maxWorldRow = 50;
-    final int worldWidth = tileSize * maxWorldCol;
-    final int worldHeight = tileSize * maxWorldRow;
+    int worldWidth;
+    int worldHeight;
+
+    private CollisionManager collisionManager;
+
+    private boolean inDungeon = false;
 
     private Thread gameThread;
     private KeyHandler keyH;
     private Player player;
     private Camera camera;
-    private TileManager tileM;
+    MapBackground mapBackground;
+
+    // STORY SYSTEM
+    private StoryManager storyManager = new StoryManager();
+
+    private String currentStory = "";
+    private boolean storyOpen = false;
+    private boolean[] storyTriggered = new boolean[11];
+    private boolean showWensAfterStory = false;
+    private boolean showKhaiAfterStory = false;
+    private boolean endingChoiceOpen = false;
+    private boolean endingChosen = false;
+
+    private Rectangle restoreBtn;
+    private Rectangle replaceBtn;
+
+    // ending credits
+    private Image creditsBG;
+    private boolean creditsOpen = false;
+    private Rectangle creditsContinueBtn;
+    private String currentStoryId = "";
+
+
 
     // enemies
     private final List<Enemy> enemies = new ArrayList<>();
@@ -128,8 +159,17 @@ public class GameScreen extends JPanel implements Runnable {
         keyH = new KeyHandler(this);
         addKeyListener(keyH);
 
-        camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
-        tileM = new TileManager(this);
+        mapBackground = new MapBackground();
+        mapBackground.loadMap("tiles/world1/map1.png");
+
+        worldWidth = mapBackground.worldWidth;
+        worldHeight = mapBackground.worldHeight;
+
+        collisionManager = new CollisionManager("maps/Detailed_Map1_Collision.tmx");
+
+        dungeonManager = new DungeonManager();
+
+        camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, mapBackground.worldWidth, mapBackground.worldHeight);
 
         try {
             shopBG = new ImageIcon("images/Shop_UI.png").getImage();
@@ -145,6 +185,7 @@ public class GameScreen extends JPanel implements Runnable {
             itemCardImg = new ImageIcon("images/Shop_Item_Placeholder.png").getImage();
             wensDialogueImg = new ImageIcon("images/Wens_dialogue.png").getImage();
             khaiDialogueImg = new ImageIcon("images/Khai_dialogue.png").getImage();
+            creditsBG = new ImageIcon("images/CreditsBG.png").getImage();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -198,6 +239,34 @@ public class GameScreen extends JPanel implements Runnable {
             @Override
             public void mouseClicked(MouseEvent e) {
                 Point p = e.getPoint();
+                if (creditsOpen) {
+                    if (creditsContinueBtn == null || creditsContinueBtn.contains(e.getPoint())) {
+                        endGame();
+                    }
+                    return;
+                }
+
+                if (endingChoiceOpen && !storyOpen) {
+                    if (restoreBtn != null && restoreBtn.contains(p)) {
+                        endingChoiceOpen = false;
+                        endingChosen = true;
+                        showStory("ENDING_RESTORE");
+                        return;
+                    }
+
+                    if (replaceBtn != null && replaceBtn.contains(p)) {
+                        endingChoiceOpen = false;
+                        endingChosen = true;
+                        showStory("ENDING_REPLACE");
+                        return;
+                    }
+                }
+
+                if (storyOpen) {
+                    closeStory();
+                    return;
+                }
+
                 if (wensDialogueOpen) {
                     wensDialogueOpen = false;
                     return;
@@ -314,6 +383,158 @@ public class GameScreen extends JPanel implements Runnable {
 
     }
 
+    public void showStory(String id) {
+        wensDialogueOpen = false;
+        khaiDialogueOpen = false;
+        shopDialogueOpen = false;
+
+        currentStoryId = id;
+        currentStory = storyManager.getStory(id);
+        storyOpen = true;
+    }
+
+    public boolean isStoryOpen() {
+        return storyOpen;
+    }
+
+    public void closeStory() {
+        String closedStoryId = currentStoryId;
+
+        storyOpen = false;
+        currentStory = "";
+        currentStoryId = "";
+
+        if (endingChosen &&
+                ("ENDING_RESTORE".equals(closedStoryId) || "ENDING_REPLACE".equals(closedStoryId))) {
+
+            creditsOpen = true;
+            endingChosen = false;
+            repaint();
+            return;
+        }
+
+        if (showWensAfterStory) {
+            wensDialogueOpen = true;
+            showWensAfterStory = false;
+        }
+
+        if (showKhaiAfterStory) {
+            khaiDialogueOpen = true;
+            showKhaiAfterStory = false;
+        }
+    }
+
+    private void endGame() {
+        stopGame();
+
+        Window gameWindow = SwingUtilities.getWindowAncestor(this);
+
+        if (gameWindow != null) {
+            gameWindow.dispose();
+        }
+
+        System.exit(0);
+    }
+
+    private void playMusic(String fileName) {
+        if (fileName.equals(currentMusic)) return;
+
+        SoundManager.playBgm(fileName);
+        currentMusic = fileName;
+    }
+
+    private void switchWorld(int world) {
+        currentWorld = world;
+        inDungeon = false;
+
+        if (world == 1) {
+            mapBackground.loadMap("tiles/world1/map1.png");
+            collisionManager = new CollisionManager("maps/Detailed_Map1_Collision.tmx");
+
+            player.x = 678;
+            player.y = 1450;
+        }
+
+        if (world == 2) {
+            mapBackground.loadMap("tiles/world2/map2.png");
+            collisionManager = new CollisionManager("maps/Detailed_Map2_Collision.tmx");
+            playMusic("world2.wav"); //placeholder
+
+            player.x = 800;
+            player.y = 982;
+        }
+
+        if (world == 3) {
+            mapBackground.loadMap("tiles/world3/map3.png");
+            collisionManager = new CollisionManager("maps/Detailed_Map3_Collision.tmx");
+            playMusic("world1.wav"); //placeholder
+
+            player.x = 3024;
+            player.y = 1584;
+        }
+
+        worldWidth = mapBackground.worldWidth;
+        worldHeight = mapBackground.worldHeight;
+
+        camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
+
+        enemies.clear();
+
+        if (playerCharacter != null) {
+            spawnEnemies();
+        }
+
+        repaint();
+    }
+
+    private void switchToDungeon(int dungeonNumber) {
+        DungeonData dungeon = dungeonManager.getDungeon(currentWorld, dungeonNumber);
+
+        if (dungeon == null) {
+            System.out.println("Dungeon not found");
+            return;
+        }
+
+        dungeonManager.enterDungeon(dungeonNumber);
+
+        mapBackground.loadMap(dungeon.mapPath);
+        collisionManager = new CollisionManager(dungeon.collisionPath);
+
+        player.x = dungeon.enterX;
+        player.y = dungeon.enterY;
+
+        worldWidth = mapBackground.worldWidth;
+        worldHeight = mapBackground.worldHeight;
+        camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
+
+        enemies.clear();
+    }
+
+    private void switchToWorld() {
+        DungeonData dungeon = dungeonManager.getDungeon(
+                currentWorld,
+                dungeonManager.getCurrentDungeon()
+        );
+
+        dungeonManager.exitDungeon();
+
+        switchWorld(currentWorld);
+
+        if (dungeon != null) {
+
+            player.x = dungeon.returnX;
+            player.y = dungeon.returnY;
+
+            Rectangle playerBox = new Rectangle(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
+
+            Rectangle exitArea = dungeonManager.getExitRect(currentWorld, dungeonManager.getCurrentDungeon());
+            if (exitArea != null && playerBox.intersects(exitArea)) {
+                player.x = exitArea.x;
+                player.y = exitArea.y;
+            }
+        }
+    }
+
     public void setSelectedCharacter(String name) {
         this.selectedCharacter = name;
 
@@ -340,35 +561,21 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     public boolean isTileCollision(int x, int y, int width, int height) {
-        int leftCol   = Math.max(0, x / tileSize);
-        int rightCol  = Math.min(maxWorldCol - 1, (x + width - 1) / tileSize);
-        int topRow    = Math.max(0, y / tileSize);
-        int bottomRow = Math.min(maxWorldRow - 1, (y + height - 1) / tileSize);
-
-        for (int col = leftCol; col <= rightCol; col++) {
-            for (int row = topRow; row <= bottomRow; row++) {
-                int tileNum = tileM.mapTileNum[col][row];
-                if (tileNum >= 0 && tileNum < tileM.tile.length) {
-                    Tile tile = tileM.tile[tileNum];
-                    if (tile != null && tile.collision) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
+        return collisionManager.isColliding(x, y, width, height);
     }
 
     public void startGame() {
 
         navigatingToMenu = false;
-        player.x = worldWidth / 2;
-        player.y = worldHeight / 2;
 
         if (playerCharacter == null) {
             setSelectedCharacter(selectedCharacter);
         }
+
+        playMusic("world1.wav");
+
+        player.x = worldWidth / 2;
+        player.y = worldHeight / 2;
 
         spawnEnemies();
 
@@ -494,14 +701,18 @@ public class GameScreen extends JPanel implements Runnable {
         if (won) {
             if (isBoss(defeated.character)) {
                 enemies.remove(defeated);
+
+                if (defeated.character instanceof FinalBossLogic && !storyTriggered[10]) {
+                    enemies.clear();
+                    bossSpawned = true;
+
+                    showStory("FINAL_BOSS_AFTER");
+                    storyTriggered[10] = true;
+                    endingChoiceOpen = true;
+                }
             } else {
                 defeated.defeated = true;
                 defeated.respawnTimer = 300;
-            }
-
-            if (!wensDialogueSeen && playerCharacter != null && playerCharacter.getLevel() >= 4) {
-                wensDialogueOpen = true;
-                wensDialogueSeen = true;
             }
         } else {
             pushPlayerAwayFromEnemy(defeated);
@@ -579,6 +790,8 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     private void update() {
+        if (creditsOpen) return;
+
         if (inBattle) return;
 
         if (postBattleCooldown > 0) {
@@ -593,19 +806,85 @@ public class GameScreen extends JPanel implements Runnable {
 
             int lvl = playerCharacter.getLevel();
 
-            if (!wensDialogueSeen && lvl >= 4) {
-                wensDialogueOpen = true;
+            if (lvl >= 10 && !endingChoiceOpen && !endingChosen) {
+                enemies.clear();
+                bossSpawned = true;
+
+                showStory("FINAL_BOSS_AFTER");
+                storyTriggered[10] = true;
+                endingChoiceOpen = true;
+            }
+
+            if (lvl == 1 && !storyTriggered[1]) {
+                showStory("WORLD_1_START");
+                storyTriggered[1] = true;
+            }
+
+            if (lvl == 4 && !storyTriggered[4]) {
+                switchWorld(2);
+
+                showStory("WORLD_2_START");
+                storyTriggered[4] = true;
+
+                showWensAfterStory = true;
                 wensDialogueSeen = true;
             }
 
+            if (lvl == 7 && !storyTriggered[7]) {
+                switchWorld(3);
+
+                showStory("WORLD_3_START");
+                storyTriggered[7] = true;
+            }
+
+            if (lvl == 9 && !storyTriggered[9]) {
+                showStory("FINAL_BOSS_BEFORE");
+                storyTriggered[9] = true;
+            }
+
             if ((lvl == 3 || lvl == 6 || lvl == 9) && !khaiDialogueTriggered[lvl]) {
-                khaiDialogueOpen = true;
+                if (storyOpen) {
+                    showKhaiAfterStory = true;
+                } else {
+                    khaiDialogueOpen = true;
+                }
+
                 khaiDialogueTriggered[lvl] = true;
             }
         }
 
         player.update();
+        System.out.println("Player position: " + player.x + ", " + player.y);
         camera.update(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
+
+        Rectangle playerBox = new Rectangle(
+                player.x,
+                player.y,
+                Player.SPRITE_W,
+                Player.SPRITE_H
+        );
+
+        if (!dungeonManager.isInDungeon()) {
+            int dungeonToEnter = dungeonManager.checkDungeonEntry(currentWorld, playerBox);
+
+
+            if (dungeonToEnter != 0) {
+                switchToDungeon(dungeonToEnter);
+                return;
+            }
+        }
+
+        if (dungeonManager.isInDungeon()) {
+            Rectangle exit = dungeonManager.getExitRect(
+                    currentWorld,
+                    dungeonManager.getCurrentDungeon()
+            );
+
+            if (exit != null && playerBox.intersects(exit)) {
+                switchToWorld();
+                return;
+            }
+        }
 
         for (Enemy enemy : enemies) {
 
@@ -776,7 +1055,7 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     public boolean isDialogueOpen() {
-        return wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
+        return storyOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
     }
 
     @Override
@@ -784,7 +1063,13 @@ public class GameScreen extends JPanel implements Runnable {
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
 
-        tileM.draw(g2, camera);
+        if (creditsOpen) {
+            drawEndingCredits(g2);
+            g2.dispose();
+            return;
+        }
+
+        mapBackground.draw(g2, camera);
 
         for (Enemy enemy : enemies) {
             enemy.draw(g2, camera);
@@ -800,11 +1085,11 @@ public class GameScreen extends JPanel implements Runnable {
             drawShopDialogue(g2);
         }
 
-        if (wensDialogueOpen) {
+        if (wensDialogueOpen && !storyOpen) {
             drawWensDialogue(g2);
         }
 
-        if (khaiDialogueOpen) {
+        if (khaiDialogueOpen && !storyOpen) {
             drawKhaiDialogue(g2);
         }
 
@@ -817,7 +1102,222 @@ public class GameScreen extends JPanel implements Runnable {
             drawInfoWindow(g2);
         }
 
+        if (storyOpen) {
+            drawStoryBox(g2);
+        }
+
+        if (endingChoiceOpen && !storyOpen) {
+            drawEndingChoice(g2);
+        }
+
         g2.dispose();
+    }
+
+    private void drawStoryBox(Graphics2D g2) {
+        int w = 700;
+        int padding = 24;
+        int maxTextWidth = w - padding * 2;
+
+        g2.setFont(new Font("Serif", Font.PLAIN, 16));
+        FontMetrics fm = g2.getFontMetrics();
+
+        int textHeight = measureWrappedText(g2, currentStory, maxTextWidth);
+        int h = textHeight + padding * 2 + 25;
+
+        int x = (getWidth() - w) / 2;
+        int y = getHeight() - h - 40;
+
+        g2.setColor(new Color(0, 0, 0, 220));
+        g2.fillRoundRect(x, y, w, h, 20, 20);
+
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(2));
+        g2.drawRoundRect(x, y, w, h, 20, 20);
+
+        g2.setColor(Color.WHITE);
+        drawWrappedText(g2, currentStory, x + padding, y + padding + fm.getAscent(), maxTextWidth);
+
+        g2.setFont(new Font("Serif", Font.ITALIC, 12));
+        g2.drawString("Click to continue", x + w - 140, y + h - 12);
+    }
+
+    private void drawEndingChoice(Graphics2D g2) {
+        int w = 720;
+        int h = 330;
+        int x = (getWidth() - w) / 2;
+        int y = (getHeight() - h) / 2;
+
+        g2.setColor(new Color(0, 0, 0, 230));
+        g2.fillRoundRect(x, y, w, h, 24, 24);
+
+        g2.setColor(GOLD_LIGHT);
+        g2.setStroke(new BasicStroke(2));
+        g2.drawRoundRect(x, y, w, h, 24, 24);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 24));
+        g2.setColor(GOLD_LIGHT);
+        g2.drawString("Final Command", x + 270, y + 45);
+
+        g2.setFont(new Font("Serif", Font.PLAIN, 18));
+        g2.setColor(Color.WHITE);
+
+        g2.drawString("The system awaits its final command.", x + 190, y + 95);
+        g2.drawString("Restore what was lost...", x + 250, y + 135);
+        g2.drawString("Or take the throne and continue the cycle.", x + 170, y + 175);
+        g2.drawString("There is no turning back.", x + 250, y + 215);
+
+        restoreBtn = new Rectangle(x + 90, y + 255, 240, 45);
+        replaceBtn = new Rectangle(x + 390, y + 255, 240, 45);
+
+        drawEndingButton(g2, restoreBtn, "Restore the World");
+        drawEndingButton(g2, replaceBtn, "Replace Sir Khai");
+    }
+
+    private void drawEndingButton(Graphics2D g2, Rectangle rect, String text) {
+        g2.setColor(new Color(40, 25, 10, 230));
+        g2.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 12, 12);
+
+        g2.setColor(GOLD_LIGHT);
+        g2.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 12, 12);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 16));
+        FontMetrics fm = g2.getFontMetrics();
+
+        int tx = rect.x + (rect.width - fm.stringWidth(text)) / 2;
+        int ty = rect.y + (rect.height + fm.getAscent() - fm.getDescent()) / 2;
+
+        g2.setColor(Color.WHITE);
+        g2.drawString(text, tx, ty);
+    }
+
+    private void drawEndingCredits(Graphics2D g2) {
+        int screenW = getWidth();
+        int screenH = getHeight();
+
+        // Background image
+        if (creditsBG != null) {
+            g2.drawImage(creditsBG, 0, 0, screenW, screenH, null);
+        } else {
+            g2.setColor(Color.BLACK);
+            g2.fillRect(0, 0, screenW, screenH);
+        }
+
+        // Dark panel on the right side, like your sample
+        int panelW = 430;
+        int panelH = screenH;
+        int panelX = screenW - panelW;
+        int panelY = 0;
+
+        g2.setColor(new Color(8, 10, 16, 220));
+        g2.fillRect(panelX, panelY, panelW, panelH);
+
+        g2.setColor(new Color(190, 145, 70, 180));
+        g2.setStroke(new BasicStroke(2));
+        g2.drawRect(panelX + 20, 20, panelW - 40, panelH - 40);
+
+        // Title
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 48));
+        g2.setColor(new Color(245, 220, 170));
+        drawCenteredString(g2, "The End", panelX, 70, panelW);
+
+        g2.setFont(new Font("Serif", Font.PLAIN, 20));
+        g2.setColor(new Color(220, 175, 95));
+        drawCenteredString(g2, "Thank You for Playing", panelX, 110, panelW);
+
+        // Decorative line
+        g2.setColor(new Color(190, 145, 70));
+        g2.drawLine(panelX + 80, 145, panelX + panelW - 80, 145);
+
+        // Credits
+        int leftColX = panelX + 65;
+        int rightColX = panelX + 245;
+        int startY = 200;
+
+        drawCreditSection(g2, "DESIGN", new String[]{
+                "Name Placeholder",
+                "Name Placeholder",
+                "Name Placeholder"
+        }, leftColX, startY);
+
+        drawCreditSection(g2, "PROGRAMMING", new String[]{
+                "Name Placeholder",
+                "Name Placeholder",
+                "Name Placeholder"
+        }, rightColX, startY);
+
+        drawCreditSection(g2, "ART", new String[]{
+                "Name Placeholder",
+                "Name Placeholder",
+                "Name Placeholder"
+        }, leftColX, startY + 150);
+
+        drawCreditSection(g2, "STORY", new String[]{
+                "Name Placeholder",
+                "Name Placeholder",
+                "Name Placeholder"
+        }, rightColX, startY + 150);
+
+        drawCreditSection(g2, "MUSIC", new String[]{
+                "Name Placeholder",
+                "Name Placeholder"
+        }, leftColX, startY + 300);
+
+        drawCreditSection(g2, "QA", new String[]{
+                "Name Placeholder",
+                "Name Placeholder"
+        }, rightColX, startY + 300);
+
+        // Continue button
+        creditsContinueBtn = new Rectangle(panelX + 115, screenH - 90, 210, 45);
+
+        g2.setColor(new Color(25, 20, 15, 220));
+        g2.fillRoundRect(
+                creditsContinueBtn.x,
+                creditsContinueBtn.y,
+                creditsContinueBtn.width,
+                creditsContinueBtn.height,
+                10,
+                10
+        );
+
+        g2.setColor(new Color(220, 175, 95));
+        g2.drawRoundRect(
+                creditsContinueBtn.x,
+                creditsContinueBtn.y,
+                creditsContinueBtn.width,
+                creditsContinueBtn.height,
+                10,
+                10
+        );
+
+        g2.setFont(new Font("Serif", Font.BOLD, 16));
+        g2.setColor(new Color(245, 225, 180));
+        drawCenteredString(g2, "Click to End Game", creditsContinueBtn.x, creditsContinueBtn.y + 28, creditsContinueBtn.width);
+    }
+
+    private void drawCreditSection(Graphics2D g2, String title, String[] names, int x, int y) {
+        g2.setFont(new Font("Serif", Font.BOLD, 18));
+        g2.setColor(new Color(220, 175, 95));
+        g2.drawString(title, x, y);
+
+        g2.setFont(new Font("Serif", Font.PLAIN, 15));
+        g2.setColor(new Color(230, 225, 210));
+
+        int nameY = y + 30;
+
+        for (String name : names) {
+            g2.drawString(name, x, nameY);
+            nameY += 22;
+        }
+    }
+
+    private void drawCenteredString(Graphics2D g2, String text, int x, int y, int width) {
+        FontMetrics fm = g2.getFontMetrics();
+        int textX = x + (width - fm.stringWidth(text)) / 2;
+        g2.drawString(text, textX, y);
     }
 
     private void drawShopDialogue(Graphics2D g2) {
