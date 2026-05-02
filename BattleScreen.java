@@ -6,7 +6,9 @@ import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.sound.sampled.*;
 import javax.swing.*;
@@ -97,7 +99,7 @@ public class BattleScreen extends JPanel {
     private BufferedImage skillSpriteSheet;
     private int skillFrame = 0;
     private int skillFrameTick = 0;
-    private int skillFrameSpeed = 4;
+    private int skillFrameSpeed = 2;
     private int skillMaxFrames = 1;
     private int skillFrameWidth;
     private int skillFrameHeight;
@@ -105,6 +107,9 @@ public class BattleScreen extends JPanel {
     private int activeSkillNumber = 0;
     private boolean skillOnEnemy = false;
     private boolean skillByEnemy = false;
+    private BufferedImage cachedBattleSprite;
+    private BufferedImage cachedCleanedBattleSprite;
+    private final Map<String, BufferedImage> imageCache = new HashMap<>();
 
 
     // Snapshot of the enemy's draw position at the moment a skill fires.
@@ -254,13 +259,43 @@ public class BattleScreen extends JPanel {
         ronnixBattleSprite = tryLoadImage("images/ronnix/ronnixBattle.png");
         jakaraBattleSprite = tryLoadImage("images/jakara/jakaraBattle.png");
         wensSprite = tryLoadImage("images/Wens.png");
+
+        String[] skillSheets = {
+                "images/Aya_ChasingArrow.png",
+                "images/Aya_MetalRain.png",
+                "images/Aya_SagittariusPunishment.png",
+                "images/Ronnix_SwordSlash.png",
+                "images/Ronnix_DeathThrust.png",
+                "images/Ronnix_DivineStrike.png",
+                "images/Bloodmancer_CurseWave.png",
+                "images/Bloodmancer_Hemoburst.png",
+                "images/Bloodmancer_SoulDrain.png",
+                "images/Noctyx_DarkSlash.png",
+                "images/Noctyx_ShadowBlink.png",
+                "images/Noctyx_VoidBurst.png",
+                "images/Khai_Codechum.png",
+                "images/Khai_Execute.png",
+                "images/Khai_SuddenQuiz.png"
+        };
+
+        for (String sheet : skillSheets) {
+            tryLoadImage(sheet);
+        }
     }
 
     /** Returns the loaded BufferedImage, or null if the file is missing. */
     private BufferedImage tryLoadImage(String path) {
+        if (imageCache.containsKey(path)) {
+            return imageCache.get(path);
+        }
+
         try {
             File f = new File(path);
-            if (f.exists()) return ImageIO.read(f);
+            if (f.exists()) {
+                BufferedImage img = ImageIO.read(f);
+                imageCache.put(path, img);
+                return img;
+            }
         } catch (Exception e) {
             System.err.println("BattleScreen: could not load " + path);
         }
@@ -340,6 +375,8 @@ public class BattleScreen extends JPanel {
         this.skillFrameHeight = 0;
         this.activeSkillNumber = 0;
         this.skillOnEnemy = false;
+        this.cachedBattleSprite = null;
+        this.cachedCleanedBattleSprite = null;
         this.frozenEnemyX = 0;
         this.frozenEnemyY = 0;
         this.frozenEnemyW = 0;
@@ -412,7 +449,6 @@ public class BattleScreen extends JPanel {
         skillFrameHeight = attacker.getSkillFrameHeight(skillNumber);
         skillMaxFrames   = attacker.getSkillMaxFrames(skillNumber);
         activeSkillNumber = skillNumber;
-
         // Give enough ticks so every frame is shown at the chosen speed.
         skillAnimTicks = skillMaxFrames * skillFrameSpeed + skillFrameSpeed;
 
@@ -678,6 +714,21 @@ public class BattleScreen extends JPanel {
             return;
         }
 
+        int waitForPlayerSkill = (skillAnimTicks > 0 && !skillByEnemy)
+                ? skillAnimTicks * 16 + 80
+                : 0;
+
+        isHealingPhase = true;
+        Timer wait = new Timer(waitForPlayerSkill, e -> {
+            isHealingPhase = false;
+            beginEnemyTurn();
+            ((Timer)e.getSource()).stop();
+        });
+        wait.setRepeats(false);
+        wait.start();
+    }
+
+    private void beginEnemyTurn() {
         phase = Phase.ENEMY_TURN;
         addLog(enemyCharacter.getName() + " is attacking...");
 
@@ -1007,7 +1058,7 @@ public class BattleScreen extends JPanel {
         BufferedImage sprite = currentPlayerSprite();
 
         if (!playerUsingSkill && sprite != null) {
-            BufferedImage cleaned = stripWhiteBackground(sprite);
+            BufferedImage cleaned = getCleanedBattleSprite(sprite);
             Rectangle visibleSource = findVisibleBounds(cleaned, 0, 0, cleaned.getWidth(), cleaned.getHeight());
             Rectangle visibleDest = mapSourceBoundsToDest(
                     visibleSource,
@@ -1057,7 +1108,7 @@ public class BattleScreen extends JPanel {
         // ── Draw the actual battle sprite ─────────────────────────────────────
         if (sprite != null && !playerUsingSkill) {
             // Strip near-white background if the source image has one
-            BufferedImage cleaned = stripWhiteBackground(sprite);
+            BufferedImage cleaned = getCleanedBattleSprite(sprite);
             g2.drawImage(cleaned, px + offX, py, pW, pH, null);
         } else if (!playerUsingSkill) {
             // Fallback drawn silhouette when the sprite file is missing
@@ -1152,6 +1203,14 @@ public class BattleScreen extends JPanel {
         boolean nearWhite = r > 195 && g > 195 && b > 195;
         boolean lavenderEdge = b > 170 && r > 80 && g > 45 && b > r + 25;
         return nearWhite || lavenderEdge;
+    }
+
+    private BufferedImage getCleanedBattleSprite(BufferedImage sprite) {
+        if (sprite != cachedBattleSprite) {
+            cachedBattleSprite = sprite;
+            cachedCleanedBattleSprite = stripWhiteBackground(sprite);
+        }
+        return cachedCleanedBattleSprite;
     }
 
     //Timer
@@ -1388,33 +1447,32 @@ public class BattleScreen extends JPanel {
         int safeFrame = skillFrame % skillMaxFrames;
         int sx = safeFrame * skillFrameWidth;
 
-        int baseX = skillByEnemy ? frozenEnemyVisibleX : frozenPlayerVisibleX;
-        int baseY = skillByEnemy ? frozenEnemyVisibleY : frozenPlayerVisibleY;
-        int baseW = skillByEnemy ? frozenEnemyVisibleW : frozenPlayerVisibleW;
-        int baseH = skillByEnemy ? frozenEnemyVisibleH : frozenPlayerVisibleH;
+        int baseX = skillByEnemy ? frozenEnemyX : frozenPlayerX;
+        int baseY = skillByEnemy ? frozenEnemyY : frozenPlayerY;
+        int baseW = skillByEnemy ? frozenEnemyW : frozenPlayerW;
+        int baseH = skillByEnemy ? frozenEnemyH : frozenPlayerH;
 
-        if (baseW <= 0 || baseH <= 0) {
-            baseX = skillByEnemy ? frozenEnemyX : frozenPlayerX;
-            baseY = skillByEnemy ? frozenEnemyY : frozenPlayerY;
-            baseW = skillByEnemy ? frozenEnemyW : frozenPlayerW;
-            baseH = skillByEnemy ? frozenEnemyH : frozenPlayerH;
-        }
+        Rectangle sourceBounds = new Rectangle(sx, 0, skillFrameWidth, skillFrameHeight);
+        drawImageSameHeight(g2, skillSpriteSheet, sourceBounds, baseX, baseY, baseW, baseH);
+    }
 
-        Rectangle sourceBounds = findVisibleBounds(
-                skillSpriteSheet,
-                sx,
-                0,
-                skillFrameWidth,
-                skillFrameHeight
-        );
+    private void drawImageSameHeight(Graphics2D g2, BufferedImage img, Rectangle src,
+                                     int destX, int destY, int destW, int destH) {
+        if (destW <= 0 || destH <= 0 || src.width <= 0 || src.height <= 0) return;
+
+        double scale = (double)destH / src.height;
+        int drawW = Math.max(1, (int)Math.round(src.width * scale));
+        int drawH = destH;
+        int drawX = destX + (destW - drawW) / 2;
+        int drawY = destY;
 
         g2.drawImage(
-                skillSpriteSheet,
-                baseX, baseY,
-                baseX + baseW, baseY + baseH,
-                sourceBounds.x, sourceBounds.y,
-                sourceBounds.x + sourceBounds.width,
-                sourceBounds.y + sourceBounds.height,
+                img,
+                drawX, drawY,
+                drawX + drawW, drawY + drawH,
+                src.x, src.y,
+                src.x + src.width,
+                src.y + src.height,
                 null
         );
     }
