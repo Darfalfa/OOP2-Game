@@ -73,10 +73,21 @@ public class GameScreen extends JPanel implements Runnable {
     private static final int ENEMY_COUNT = 10;
     private int lastPlayerLevel = -1;
     private boolean bossSpawned = false;
+    private boolean finalBossDefeated = false;
 
     // Puzzle pieces
     private int puzzlePieceCount = 0;
     private boolean[] puzzlePieceCollected = new boolean[4]; // 4 puzzle pieces total
+    private Image[] puzzlePieceImages = new Image[4];
+    private boolean puzzlePiecePopupOpen = false;
+    private Image puzzlePiecePopupImage;
+    private String puzzlePiecePopupText = "";
+    private Image[] dungeonIntroImages = new Image[4];
+    private boolean dungeonIntroPopupOpen = false;
+    private Image dungeonIntroPopupImage;
+    private boolean dungeonIntroPopupUsesPuzzleStyle = false;
+    private final List<Image> dungeonIntroQueue = new ArrayList<>();
+    private final List<Boolean> dungeonIntroStyleQueue = new ArrayList<>();
 
     private Character playerCharacter;
 
@@ -133,6 +144,8 @@ public class GameScreen extends JPanel implements Runnable {
     private boolean khaiDialogueOpen = false;
     private Image khaiDialogueImg;
     private boolean[] khaiDialogueTriggered = new boolean[10];
+    private String khaiDialogueMessage = "";
+    private int blockedDungeonWarning = 0;
 
     // Feedback message shown at the top of the shop (not blocking buttons)
     private String shopFeedback = "";
@@ -193,6 +206,14 @@ public class GameScreen extends JPanel implements Runnable {
             wensDialogueImg = new ImageIcon("images/Wens_dialogue.png").getImage();
             khaiDialogueImg = new ImageIcon("images/Khai_dialogue.png").getImage();
             creditsBG = new ImageIcon("images/CreditsBG.png").getImage();
+            puzzlePieceImages[0] = new ImageIcon("images/Puzzle_A.png").getImage();
+            puzzlePieceImages[1] = new ImageIcon("images/Puzzle_K.png").getImage();
+            puzzlePieceImages[2] = new ImageIcon("images/Puzzle_H.png").getImage();
+            puzzlePieceImages[3] = new ImageIcon("images/Puzzle_I.png").getImage();
+            dungeonIntroImages[0] = new ImageIcon("images/B1_Intro.png").getImage();
+            dungeonIntroImages[1] = new ImageIcon("images/B2_Intro.png").getImage();
+            dungeonIntroImages[2] = new ImageIcon("images/B3_Intro.png").getImage();
+            dungeonIntroImages[3] = new ImageIcon("images/Puzzle_Complete.png").getImage();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -271,6 +292,19 @@ public class GameScreen extends JPanel implements Runnable {
 
                 if (storyOpen) {
                     closeStory();
+                    return;
+                }
+
+                if (puzzlePiecePopupOpen) {
+                    puzzlePiecePopupOpen = false;
+                    puzzlePiecePopupImage = null;
+                    puzzlePiecePopupText = "";
+                    repaint();
+                    return;
+                }
+
+                if (dungeonIntroPopupOpen) {
+                    advanceDungeonIntroPopup();
                     return;
                 }
 
@@ -400,6 +434,14 @@ public class GameScreen extends JPanel implements Runnable {
         storyOpen = true;
     }
 
+    private void showKhaiDialogue(String message) {
+        wensDialogueOpen = false;
+        shopDialogueOpen = false;
+        khaiDialogueMessage = message == null ? "" : message;
+        khaiDialogueOpen = true;
+        repaint();
+    }
+
     public boolean isStoryOpen() {
         return storyOpen;
     }
@@ -426,7 +468,7 @@ public class GameScreen extends JPanel implements Runnable {
         }
 
         if (showKhaiAfterStory) {
-            khaiDialogueOpen = true;
+            showKhaiDialogue("");
             showKhaiAfterStory = false;
         }
     }
@@ -527,6 +569,47 @@ public class GameScreen extends JPanel implements Runnable {
 
         enemies.clear();
         spawnEnemies();  // Spawn dungeon enemies
+        showDungeonIntroIfNeeded(currentWorld, dungeonNumber);
+    }
+
+    private void showDungeonIntroIfNeeded(int world, int dungeonNumber) {
+        dungeonIntroQueue.clear();
+        dungeonIntroStyleQueue.clear();
+
+        if (world == 1 && dungeonNumber == 3) {
+            queueDungeonIntro(dungeonIntroImages[0]);
+        } else if (world == 2 && dungeonNumber == 3) {
+            queueDungeonIntro(dungeonIntroImages[1]);
+        } else if (world == 3 && dungeonNumber == 3) {
+            queueDungeonIntro(dungeonIntroImages[3], true);
+            queueDungeonIntro(dungeonIntroImages[2]);
+        }
+
+        advanceDungeonIntroPopup();
+    }
+
+    private void queueDungeonIntro(Image image) {
+        queueDungeonIntro(image, false);
+    }
+
+    private void queueDungeonIntro(Image image, boolean usePuzzleStyle) {
+        if (image != null) {
+            dungeonIntroQueue.add(image);
+            dungeonIntroStyleQueue.add(usePuzzleStyle);
+        }
+    }
+
+    private void advanceDungeonIntroPopup() {
+        if (dungeonIntroQueue.isEmpty()) {
+            dungeonIntroPopupOpen = false;
+            dungeonIntroPopupImage = null;
+            dungeonIntroPopupUsesPuzzleStyle = false;
+        } else {
+            dungeonIntroPopupImage = dungeonIntroQueue.remove(0);
+            dungeonIntroPopupUsesPuzzleStyle = !dungeonIntroStyleQueue.isEmpty() && dungeonIntroStyleQueue.remove(0);
+            dungeonIntroPopupOpen = true;
+        }
+        repaint();
     }
 
         private void switchToWorld() {
@@ -703,6 +786,7 @@ public class GameScreen extends JPanel implements Runnable {
         // If no minions, spawn boss instead
         String bossType = dungeonManager.getBossType(world, dungeonNum);
         if (bossType != null) {
+            if (world == 3 && dungeonNum == 3 && finalBossDefeated) return;
             if (bossSpawned) return;
             
             int[] bossPos = dungeonManager.getBossSpawnPos(world, dungeonNum);
@@ -822,6 +906,13 @@ public class GameScreen extends JPanel implements Runnable {
                     }
                 }
 
+                if (defeated.character instanceof FinalBossLogic &&
+                        inDungeon && currentWorld == 3 && dungeonManager.getCurrentDungeon() == 3) {
+                    finalBossDefeated = true;
+                    enemies.clear();
+                    bossSpawned = true;
+                }
+
                 if (defeated.character instanceof FinalBossLogic && !storyTriggered[10]) {
                     enemies.clear();
                     bossSpawned = true;
@@ -904,8 +995,16 @@ public class GameScreen extends JPanel implements Runnable {
         if (pieceIndex >= 0 && pieceIndex < 4 && !puzzlePieceCollected[pieceIndex]) {
             puzzlePieceCollected[pieceIndex] = true;
             puzzlePieceCount++;
+            showPuzzlePiecePopup(pieceIndex);
             System.out.println("Puzzle piece acquired! " + puzzlePieceCount + " out of 4");
         }
+    }
+
+    private void showPuzzlePiecePopup(int pieceIndex) {
+        puzzlePiecePopupImage = puzzlePieceImages[pieceIndex];
+        puzzlePiecePopupText = puzzlePieceCount + "/4 acquired";
+        puzzlePiecePopupOpen = true;
+        repaint();
     }
 
     /**
@@ -982,6 +1081,8 @@ public class GameScreen extends JPanel implements Runnable {
             return;
         }
         if (creditsOpen) return;
+        if (puzzlePiecePopupOpen) return;
+        if (dungeonIntroPopupOpen) return;
 
         if (inBattle) return;
 
@@ -1037,7 +1138,7 @@ public class GameScreen extends JPanel implements Runnable {
                 if (storyOpen) {
                     showKhaiAfterStory = true;
                 } else {
-                    khaiDialogueOpen = true;
+                    showKhaiDialogue("");
                 }
 
                 khaiDialogueTriggered[lvl] = true;
@@ -1062,13 +1163,24 @@ public class GameScreen extends JPanel implements Runnable {
                 // Check if player has sufficient level
                 int playerLevel = playerCharacter != null ? playerCharacter.getLevel() : 1;
                 if (dungeonManager.canEnterDungeon(currentWorld, dungeonToEnter, playerLevel)) {
+                    blockedDungeonWarning = 0;
                     switchToDungeon(dungeonToEnter);
                     return;
                 } else {
-                    // Optional: show message that level is too low
-                    System.out.println("Level too low for this dungeon!");
+                    if (blockedDungeonWarning != dungeonToEnter) {
+                        showKhaiDialogue(
+                                "Level is too low for this dungeon.\n\n" +
+                                "You are not strong enough to enter this place yet.\n\n" +
+                                "Return when your level is higher."
+                        );
+                        blockedDungeonWarning = dungeonToEnter;
+                    }
                 }
+            } else {
+                blockedDungeonWarning = 0;
             }
+        } else {
+            blockedDungeonWarning = 0;
         }
 
         if (dungeonManager.isInDungeon()) {
@@ -1255,7 +1367,7 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     public boolean isDialogueOpen() {
-        return storyOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
+        return storyOpen || puzzlePiecePopupOpen || dungeonIntroPopupOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
     }
 
         public void toggleCollisionDebug() {
@@ -1359,6 +1471,14 @@ public class GameScreen extends JPanel implements Runnable {
             drawInfoWindow(g2);
         }
 
+        if (puzzlePiecePopupOpen) {
+            drawPuzzlePiecePopup(g2);
+        }
+
+        if (dungeonIntroPopupOpen) {
+            drawDungeonIntroPopup(g2);
+        }
+
         if (storyOpen) {
             drawStoryBox(g2);
         }
@@ -1396,6 +1516,139 @@ public class GameScreen extends JPanel implements Runnable {
 
         g2.setFont(new Font("Serif", Font.ITALIC, 12));
         g2.drawString("Click to continue", x + w - 140, y + h - 12);
+    }
+
+    private void drawPuzzlePiecePopup(Graphics2D g2) {
+        drawPuzzleImagePopup(g2, puzzlePiecePopupImage, puzzlePiecePopupText);
+    }
+
+    private void drawPuzzleImagePopup(Graphics2D g2, Image image, String title) {
+        int W = getWidth();
+        int H = getHeight();
+
+        g2.setColor(new Color(0, 0, 0, 135));
+        g2.fillRect(0, 0, W, H);
+
+        int centerX = W / 2;
+        int centerY = H / 2 + 8;
+        int glowRadius = Math.min(220, Math.max(140, W / 6));
+
+        RadialGradientPaint glow = new RadialGradientPaint(
+                new Point(centerX, centerY),
+                glowRadius,
+                new float[]{0f, 0.55f, 1f},
+                new Color[]{
+                        new Color(255, 225, 120, 185),
+                        new Color(220, 185, 90, 75),
+                        new Color(255, 220, 120, 0)
+                }
+        );
+        Paint oldPaint = g2.getPaint();
+        g2.setPaint(glow);
+        g2.fillOval(centerX - glowRadius, centerY - glowRadius, glowRadius * 2, glowRadius * 2);
+        g2.setPaint(oldPaint);
+
+        int circleSize = Math.min(320, Math.max(220, W / 4));
+        int circleX = centerX - circleSize / 2;
+        int circleY = centerY - circleSize / 2;
+
+        g2.setColor(new Color(215, 190, 120, 95));
+        g2.setStroke(new BasicStroke(3f));
+        g2.drawOval(circleX, circleY, circleSize, circleSize);
+        g2.setColor(new Color(225, 210, 150, 45));
+        g2.setStroke(new BasicStroke(1.4f));
+        g2.drawOval(circleX + 18, circleY + 18, circleSize - 36, circleSize - 36);
+        g2.drawLine(centerX, circleY + 28, circleX + circleSize - 38, circleY + circleSize - 48);
+        g2.drawLine(circleX + 38, circleY + circleSize - 48, circleX + circleSize - 38, circleY + circleSize - 48);
+        g2.drawLine(centerX, circleY + 28, circleX + 38, circleY + circleSize - 48);
+
+        int imgW = 190;
+        int imgH = 150;
+        if (image != null) {
+            int naturalW = image.getWidth(null);
+            int naturalH = image.getHeight(null);
+            if (naturalW > 0 && naturalH > 0) {
+                double ratio = Math.min(220.0 / naturalW, 170.0 / naturalH);
+                imgW = Math.max(1, (int)Math.round(naturalW * ratio));
+                imgH = Math.max(1, (int)Math.round(naturalH * ratio));
+            }
+        }
+
+        int imgX = centerX - imgW / 2;
+        int imgY = centerY - imgH / 2 + 8;
+
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        if (image != null) {
+            g2.drawImage(image, imgX, imgY, imgW, imgH, null);
+        }
+
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setFont(new Font("Serif", Font.PLAIN, 40));
+        FontMetrics titleFm = g2.getFontMetrics();
+        int titleX = centerX - titleFm.stringWidth(title) / 2;
+        int titleY = Math.max(90, imgY - 34);
+        g2.setColor(new Color(0, 0, 0, 155));
+        g2.drawString(title, titleX + 2, titleY + 2);
+        g2.setColor(Color.WHITE);
+        g2.drawString(title, titleX, titleY);
+
+        String prompt = "Click to continue";
+        g2.setFont(new Font("Serif", Font.ITALIC, 14));
+        FontMetrics promptFm = g2.getFontMetrics();
+        g2.setColor(new Color(235, 230, 245, 190));
+        g2.drawString(prompt, centerX - promptFm.stringWidth(prompt) / 2,
+                Math.min(H - 34, centerY + circleSize / 2 + 42));
+    }
+
+    private void drawDungeonIntroPopup(Graphics2D g2) {
+        if (dungeonIntroPopupUsesPuzzleStyle) {
+            drawPuzzleImagePopup(g2, dungeonIntroPopupImage, "Puzzle complete");
+            return;
+        }
+
+        int W = getWidth();
+        int H = getHeight();
+
+        g2.setColor(new Color(0, 0, 0, 165));
+        g2.fillRect(0, 0, W, H);
+
+        if (dungeonIntroPopupImage != null) {
+            int naturalW = dungeonIntroPopupImage.getWidth(null);
+            int naturalH = dungeonIntroPopupImage.getHeight(null);
+
+            if (naturalW > 0 && naturalH > 0) {
+                int maxW = (int)(W * 0.82);
+                int maxH = (int)(H * 0.72);
+                double scale = Math.min((double)maxW / naturalW, (double)maxH / naturalH);
+
+                int drawW = Math.max(1, (int)Math.round(naturalW * scale));
+                int drawH = Math.max(1, (int)Math.round(naturalH * scale));
+                int drawX = (W - drawW) / 2;
+                int drawY = (H - drawH) / 2 - 8;
+
+                g2.setColor(new Color(255, 230, 150, 80));
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(drawX - 8, drawY - 8, drawW + 16, drawH + 16, 8, 8);
+
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g2.drawImage(dungeonIntroPopupImage, drawX, drawY, drawW, drawH, null);
+            }
+        }
+
+        String prompt = "Click to continue";
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setFont(new Font("Serif", Font.ITALIC, 15));
+        FontMetrics fm = g2.getFontMetrics();
+        int x = W / 2 - fm.stringWidth(prompt) / 2;
+        int y = H - 36;
+        g2.setColor(new Color(0, 0, 0, 170));
+        g2.drawString(prompt, x + 2, y + 2);
+        g2.setColor(new Color(245, 240, 255, 220));
+        g2.drawString(prompt, x, y);
     }
 
     private void drawEndingChoice(Graphics2D g2) {
@@ -1811,15 +2064,51 @@ public class GameScreen extends JPanel implements Runnable {
                 RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setFont(new Font("Serif", Font.PLAIN, 15));
         g2.setColor(new Color(215, 210, 235));
-        g2.drawString("So\u2026 you\u2019ve finally made it this far.",          textX, textStartY);
-        g2.drawString("You\u2019re stronger now\u2014strong enough to face what lies ahead.", textX, textStartY + lineGap);
-        g2.drawString("The Boss Dungeon is open to you.",                         textX, textStartY + lineGap * 2);
-        g2.drawString("\u2026Go on. Step inside.",                                textX, textStartY + lineGap * 3);
-        g2.drawString("I\u2019ll be waiting.",                                    textX, textStartY + lineGap * 4);
+
+        if (khaiDialogueMessage != null && !khaiDialogueMessage.isEmpty()) {
+            int textMaxW = imgX + imgW - textX - 48;
+            drawKhaiWrappedText(g2, khaiDialogueMessage, textX, textStartY, textMaxW);
+        } else {
+            g2.drawString("So\u2026 you\u2019ve finally made it this far.",          textX, textStartY);
+            g2.drawString("You\u2019re stronger now\u2014strong enough to face what lies ahead.", textX, textStartY + lineGap);
+            g2.drawString("The Boss Dungeon is open to you.",                         textX, textStartY + lineGap * 2);
+            g2.drawString("\u2026Go on. Step inside.",                                textX, textStartY + lineGap * 3);
+            g2.drawString("I\u2019ll be waiting.",                                    textX, textStartY + lineGap * 4);
+        }
 
         g2.setFont(new Font("Serif", Font.ITALIC, 13));
         g2.setColor(new Color(180, 170, 200, 200));
         g2.drawString("Click to continue", imgX + imgW - 148, boxBotY - 6);
+    }
+
+    private void drawKhaiWrappedText(Graphics2D g2, String text, int x, int y, int maxWidth) {
+        FontMetrics fm = g2.getFontMetrics();
+        int lineHeight = fm.getHeight() + 4;
+        int paragraphGap = lineHeight / 2;
+
+        for (String paragraph : text.split("\\n", -1)) {
+            if (paragraph.isEmpty()) {
+                y += paragraphGap;
+                continue;
+            }
+
+            String line = "";
+            for (String word : paragraph.split(" ")) {
+                String test = line + word + " ";
+                if (fm.stringWidth(test) > maxWidth && !line.isEmpty()) {
+                    g2.drawString(line.trim(), x, y);
+                    line = word + " ";
+                    y += lineHeight;
+                } else {
+                    line = test;
+                }
+            }
+
+            if (!line.isEmpty()) {
+                g2.drawString(line.trim(), x, y);
+                y += lineHeight;
+            }
+        }
     }
 
     private void drawWensWrappedText(Graphics2D g2, String text, int x, int y, int maxWidth) {

@@ -114,11 +114,11 @@ public class DungeonManager {
         
         // WORLD 3 - DUNGEON 3 (Khai boss) - Level 9+ required
         dungeons.put("3-3", new DungeonData(
-                "tiles/world3/World3_D3.png", "maps/World3_D3.tmx",
-                1035, 750, 1046, 1250, 100, 50, 1456, 377, 1456, 269, 80, 80,
+                "tiles/world3/Wrold3_D3.png", "maps/World3_D3_Collision.tmx",
+                999, 990,999, 1150, 100, 50, 1456, 377, 1456, 269, 80, 80,
                 9,
                 null, 0, null,
-                "Khai", 1035, 438, false  // boss config (no puzzle piece for final boss)
+                "Khai", 1100, 700, false  // boss config (no puzzle piece for final boss)
         ));
     }
 
