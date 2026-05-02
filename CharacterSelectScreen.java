@@ -66,7 +66,7 @@ public class CharacterSelectScreen extends JPanel {
 
     private void loadImages() {
         for (int i = 0; i < 3; i++) {
-            portraits[i] = loadPrepared(PORTRAIT_PATHS[i], 148, 148, true);
+            portraits[i] = loadPortrait(PORTRAIT_PATHS[i], 148, 148);
             previews[i] = loadPrepared(PREVIEW_PATHS[i], 330, 430, false);
             if (previews[i] == null) {
                 previews[i] = loadPrepared(PORTRAIT_PATHS[i], 330, 430, false);
@@ -294,7 +294,10 @@ public class CharacterSelectScreen extends JPanel {
         BufferedImage portrait = portraits[idx];
         if (portrait != null) {
             int pad = 12;
-            g2.drawImage(portrait, r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2 - 26, null);
+            Shape oldClip = g2.getClip();
+            g2.setClip(new RoundRectangle2D.Double(r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2 - 30, 10, 10));
+            g2.drawImage(portrait, r.x + pad, r.y + pad, r.width - pad * 2, r.height - pad * 2 - 30, null);
+            g2.setClip(oldClip);
         }
 
         g2.setFont(new Font("Serif", Font.BOLD, 16));
@@ -451,6 +454,41 @@ public class CharacterSelectScreen extends JPanel {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private BufferedImage loadPortrait(String path, int outW, int outH) {
+        try {
+            BufferedImage src = ImageIO.read(new File(path));
+            if (src == null) return null;
+            return preparePortrait(src, outW, outH);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private BufferedImage preparePortrait(BufferedImage src, int outW, int outH) {
+        BufferedImage argb = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D tmp = argb.createGraphics();
+        tmp.drawImage(src, 0, 0, null);
+        tmp.dispose();
+
+        removeBackground(argb);
+        Rectangle bounds = contentBounds(argb);
+        if (bounds == null) return null;
+
+        BufferedImage cropped = argb.getSubimage(bounds.x, bounds.y, bounds.width, bounds.height);
+        BufferedImage out = new BufferedImage(outW, outH, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = out.createGraphics();
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+        double scale = Math.max((double)outW / cropped.getWidth(), (double)outH / cropped.getHeight()) * 1.35;
+        int drawW = Math.max(1, (int)Math.round(cropped.getWidth() * scale));
+        int drawH = Math.max(1, (int)Math.round(cropped.getHeight() * scale));
+        int drawX = (outW - drawW) / 2;
+        int drawY = (int)Math.round(outH * 0.58 - drawH * 0.42);
+        g2.drawImage(cropped, drawX, drawY, drawW, drawH, null);
+        g2.dispose();
+        return out;
     }
 
     private BufferedImage prepareImage(BufferedImage src, int outW, int outH, boolean fillSquare) {

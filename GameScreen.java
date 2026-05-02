@@ -90,6 +90,15 @@ public class GameScreen extends JPanel implements Runnable {
 
     private Rectangle menuBtnRect;
     private boolean menuBtnHovered = false;
+    private Rectangle settingsBtnRect;
+    private boolean settingsBtnHovered = false;
+    private boolean settingsOpen = false;
+    private int gameMusicVol = 80;
+    private int gameSfxVol = 70;
+    private boolean gameFullscreen = false;
+    private Rectangle gameMusicTrack, gameSfxTrack, gameMusicSlider, gameSfxSlider;
+    private Rectangle gameFullscreenBtn, gameSettingsCloseBtn;
+    private String gameSettingsDragging = null;
 
     private Rectangle nextLevelBtn;
 
@@ -202,6 +211,15 @@ public class GameScreen extends JPanel implements Runnable {
             public void mouseMoved(MouseEvent e) {
                 Point p = e.getPoint();
 
+                if (settingsOpen) {
+                    boolean overSettings = (gameMusicSlider != null && gameMusicSlider.contains(p)) ||
+                            (gameSfxSlider != null && gameSfxSlider.contains(p)) ||
+                            (gameFullscreenBtn != null && gameFullscreenBtn.contains(p)) ||
+                            (gameSettingsCloseBtn != null && gameSettingsCloseBtn.contains(p));
+                    setCursor(overSettings ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
+                    return;
+                }
+
                 // ── Dialogue hover ────────────────────────────────────────────
                 if (shopDialogueOpen) {
                     int prevDH = dialogueHovered;
@@ -218,7 +236,9 @@ public class GameScreen extends JPanel implements Runnable {
                 // ── Menu button hover ─────────────────────────────────────────
                 boolean prev = menuBtnHovered;
                 menuBtnHovered = menuBtnRect != null && menuBtnRect.contains(p);
-                if (prev != menuBtnHovered) repaint();
+                boolean prevSettings = settingsBtnHovered;
+                settingsBtnHovered = settingsBtnRect != null && settingsBtnRect.contains(p);
+                if (prev != menuBtnHovered || prevSettings != settingsBtnHovered) repaint();
 
                 // ── Shop button hover ─────────────────────────────────────────
                 if (shopOpen) {
@@ -236,16 +256,58 @@ public class GameScreen extends JPanel implements Runnable {
                     return;
                 }
 
-                setCursor(menuBtnHovered
+                setCursor(menuBtnHovered || settingsBtnHovered
                         ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                         : Cursor.getDefaultCursor());
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (!settingsOpen) return;
+                if ("music".equals(gameSettingsDragging) && gameMusicTrack != null) {
+                    gameMusicVol = sliderValue(e.getX(), gameMusicTrack);
+                    SoundManager.setMusicVolume(gameMusicVol / 100f);
+                    repaint();
+                } else if ("sfx".equals(gameSettingsDragging) && gameSfxTrack != null) {
+                    gameSfxVol = sliderValue(e.getX(), gameSfxTrack);
+                    SoundManager.setSfxVolume(gameSfxVol / 100f);
+                    repaint();
+                }
             }
         });
 
         addMouseListener(new MouseAdapter() {
             @Override
+            public void mousePressed(MouseEvent e) {
+                if (!settingsOpen) return;
+                Point p = e.getPoint();
+                if (gameMusicSlider != null && gameMusicSlider.contains(p)) gameSettingsDragging = "music";
+                else if (gameSfxSlider != null && gameSfxSlider.contains(p)) gameSettingsDragging = "sfx";
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                gameSettingsDragging = null;
+            }
+
+            @Override
             public void mouseClicked(MouseEvent e) {
                 Point p = e.getPoint();
+                if (settingsOpen) {
+                    if (gameFullscreenBtn != null && gameFullscreenBtn.contains(p)) {
+                        gameFullscreen = !gameFullscreen;
+                        window.setFullscreen(gameFullscreen);
+                        repaint();
+                        return;
+                    }
+                    if (gameSettingsCloseBtn != null && gameSettingsCloseBtn.contains(p)) {
+                        settingsOpen = false;
+                        repaint();
+                        return;
+                    }
+                    return;
+                }
+
                 if (creditsOpen) {
                     if (creditsContinueBtn == null || creditsContinueBtn.contains(e.getPoint())) {
                         endGame();
@@ -286,6 +348,12 @@ public class GameScreen extends JPanel implements Runnable {
 
                 if (menuBtnRect != null && menuBtnRect.contains(e.getPoint())) {
                     goToMainMenu(); // keep your cleaner method
+                    return;
+                }
+
+                if (settingsBtnRect != null && settingsBtnRect.contains(e.getPoint())) {
+                    settingsOpen = true;
+                    repaint();
                     return;
                 }
 
@@ -595,10 +663,8 @@ public class GameScreen extends JPanel implements Runnable {
             setSelectedCharacter(selectedCharacter);
         }
 
+        resetRunState();
         playMusic(WORLD_1_MUSIC);
-
-        player.x = worldWidth / 2;
-        player.y = worldHeight / 2;
 
         spawnEnemies();
 
@@ -608,6 +674,50 @@ public class GameScreen extends JPanel implements Runnable {
             gameThread = new Thread(this);
             gameThread.setDaemon(true);
             gameThread.start();
+        }
+    }
+
+    private void resetRunState() {
+        currentWorld = 1;
+        currentMusic = "";
+        inDungeon = false;
+        dungeonManager = new DungeonManager();
+        storyManager = new StoryManager();
+        storyTriggered = new boolean[11];
+        showWensAfterStory = false;
+        showKhaiAfterStory = false;
+        endingChoiceOpen = false;
+        endingChosen = false;
+        creditsOpen = false;
+        currentStory = "";
+        currentStoryId = "";
+        storyOpen = false;
+        shopDialogueOpen = false;
+        shopOpen = false;
+        wensDialogueOpen = false;
+        wensDialogueSeen = false;
+        khaiDialogueOpen = false;
+        khaiDialogueTriggered = new boolean[10];
+        infoOpen = false;
+        settingsOpen = false;
+        inBattle = false;
+        postBattleCooldown = 0;
+        lastPlayerLevel = -1;
+        bossSpawned = false;
+        enemies.clear();
+
+        mapBackground.loadMap("tiles/world1/map1.png");
+        collisionManager = new CollisionManager("maps/Detailed_Map1_Collision.tmx");
+        worldWidth = mapBackground.worldWidth;
+        worldHeight = mapBackground.worldHeight;
+        camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
+
+        player.x = worldWidth / 2;
+        player.y = worldHeight / 2;
+
+        if (playerCharacter != null) {
+            playerCharacter.restoreStats();
+            playerCharacter.resetCooldowns();
         }
     }
 
@@ -1174,6 +1284,10 @@ public class GameScreen extends JPanel implements Runnable {
 
         if (endingChoiceOpen && !storyOpen) {
             drawEndingChoice(g2);
+        }
+
+        if (settingsOpen) {
+            drawGameSettings(g2);
         }
 
         g2.dispose();
@@ -2111,6 +2225,11 @@ public class GameScreen extends JPanel implements Runnable {
         g2.setColor(menuBtnHovered ? GOLD_LIGHT : GOLD);
         g2.drawString(lbl, tx, ty);
 
+        int sW = 130;
+        int sX = bX + bW + 12;
+        settingsBtnRect = new Rectangle(sX, bY, sW, bH);
+        drawHudButton(g2, settingsBtnRect, "SETTINGS", settingsBtnHovered);
+
         int nlW = 140;
         int nlH = 30;
         int nlX = getWidth() - nlW - 20;
@@ -2169,6 +2288,109 @@ public class GameScreen extends JPanel implements Runnable {
             g2.setFont(new Font("Arial", Font.BOLD, 16));
             g2.drawString("+", btnX + 7, btnY + 16);
         }
+    }
+
+    private void drawHudButton(Graphics2D g2, Rectangle r, String label, boolean hovered) {
+        if (hovered) {
+            g2.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 35));
+            g2.fillRoundRect(r.x - 5, r.y - 5, r.width + 10, r.height + 10, 6, 6);
+        }
+        g2.setColor(hovered ? new Color(80, 45, 10, 220) : new Color(18, 9, 5, 180));
+        g2.fillRect(r.x, r.y, r.width, r.height);
+        g2.setColor(hovered ? GOLD_LIGHT : GOLD_DARK);
+        g2.setStroke(new BasicStroke(hovered ? 2f : 1.5f));
+        g2.drawRect(r.x, r.y, r.width, r.height);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 13));
+        FontMetrics fm = g2.getFontMetrics();
+        int tx = r.x + (r.width - fm.stringWidth(label)) / 2;
+        int ty = r.y + (r.height + fm.getAscent() - fm.getDescent()) / 2;
+        g2.setColor(new Color(0, 0, 0, 180));
+        g2.drawString(label, tx + 2, ty + 2);
+        g2.setColor(hovered ? GOLD_LIGHT : GOLD);
+        g2.drawString(label, tx, ty);
+    }
+
+    private void drawGameSettings(Graphics2D g2) {
+        int W = getWidth(), H = getHeight();
+        g2.setColor(new Color(0, 0, 0, 170));
+        g2.fillRect(0, 0, W, H);
+
+        int panelW = Math.min(560, W - 80);
+        int panelH = 330;
+        int panelX = (W - panelW) / 2;
+        int panelY = (H - panelH) / 2;
+
+        g2.setColor(new Color(18, 9, 5, 235));
+        g2.fillRect(panelX, panelY, panelW, panelH);
+        g2.setColor(GOLD_DARK);
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRect(panelX, panelY, panelW, panelH);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 30));
+        FontMetrics fm = g2.getFontMetrics();
+        String title = "SETTINGS";
+        int titleX = panelX + (panelW - fm.stringWidth(title)) / 2;
+        g2.setColor(GOLD_LIGHT);
+        g2.drawString(title, titleX, panelY + 48);
+
+        int rowX = panelX + 42;
+        int rowW = panelW - 84;
+        int y = panelY + 100;
+        gameMusicTrack = drawGameSlider(g2, "MUSIC", gameMusicVol, rowX, y, rowW);
+        gameMusicSlider = sliderKnob(gameMusicTrack, gameMusicVol);
+
+        y += 58;
+        gameSfxTrack = drawGameSlider(g2, "SFX", gameSfxVol, rowX, y, rowW);
+        gameSfxSlider = sliderKnob(gameSfxTrack, gameSfxVol);
+
+        y += 64;
+        g2.setFont(new Font("Serif", Font.BOLD, 16));
+        g2.setColor(GOLD);
+        g2.drawString("FULLSCREEN", rowX, y);
+        gameFullscreenBtn = new Rectangle(rowX + 150, y - 22, 64, 28);
+        g2.setColor(gameFullscreen ? new Color(82, 45, 12) : new Color(22, 12, 8));
+        g2.fillRoundRect(gameFullscreenBtn.x, gameFullscreenBtn.y, gameFullscreenBtn.width, gameFullscreenBtn.height, 28, 28);
+        g2.setColor(gameFullscreen ? GOLD_LIGHT : GOLD_DARK);
+        g2.drawRoundRect(gameFullscreenBtn.x, gameFullscreenBtn.y, gameFullscreenBtn.width, gameFullscreenBtn.height, 28, 28);
+        int knobX = gameFullscreen ? gameFullscreenBtn.x + 38 : gameFullscreenBtn.x + 4;
+        g2.fillOval(knobX, gameFullscreenBtn.y + 4, 20, 20);
+
+        gameSettingsCloseBtn = new Rectangle(panelX + panelW - 152, panelY + panelH - 58, 110, 36);
+        drawHudButton(g2, gameSettingsCloseBtn, "CLOSE", false);
+    }
+
+    private Rectangle drawGameSlider(Graphics2D g2, String label, int value, int x, int y, int w) {
+        g2.setFont(new Font("Serif", Font.BOLD, 16));
+        g2.setColor(GOLD);
+        g2.drawString(label, x, y);
+        Rectangle track = new Rectangle(x + 150, y - 14, w - 190, 14);
+        int fillW = (int)Math.round(track.width * value / 100.0);
+        g2.setColor(new Color(20, 10, 5));
+        g2.fillRoundRect(track.x, track.y, track.width, track.height, 14, 14);
+        g2.setColor(GOLD);
+        g2.fillRoundRect(track.x, track.y, fillW, track.height, 14, 14);
+        g2.setColor(GOLD_DARK);
+        g2.drawRoundRect(track.x, track.y, track.width, track.height, 14, 14);
+        Rectangle knob = sliderKnob(track, value);
+        g2.setColor(GOLD_LIGHT);
+        g2.fillRect(knob.x, knob.y, knob.width, knob.height);
+        g2.setColor(TEXT_COLOR());
+        g2.drawString(value + "%", track.x + track.width + 12, y);
+        return track;
+    }
+
+    private Color TEXT_COLOR() {
+        return new Color(242, 221, 174);
+    }
+
+    private Rectangle sliderKnob(Rectangle track, int value) {
+        int x = (int)Math.round(track.x + track.width * value / 100.0) - 7;
+        return new Rectangle(x, track.y - 7, 14, 28);
+    }
+
+    private int sliderValue(int mouseX, Rectangle track) {
+        return Math.max(0, Math.min(100, (int)Math.round(100.0 * (mouseX - track.x) / track.width)));
     }
 
     private void drawHudBar(Graphics2D g2, int x, int y, int w, String label, int cur, int max, Color fill) {
