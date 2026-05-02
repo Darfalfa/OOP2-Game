@@ -41,10 +41,15 @@ public class CharacterSelectScreen extends JPanel {
     };
 
     private static final String[] PREVIEW_PATHS = {
-            "images/aya/ayaBattle.png",
-            "images/ronnix/ronnixBattle.png",
-            "images/jakara/jakaraBattle.png"
+            "images/aya/AyaCharacterSelection.png",
+            "images/ronnix/RonnixCharacterSelection.png",
+            "images/jakara/JakaraCharacterSelection.png"
     };
+
+    private static final double[] PORTRAIT_SCALE_MULTIPLIERS = { 1.35, 1.35, 1.35 };
+    private static final int[] PORTRAIT_X_OFFSETS = { 0, 0, -12 };
+    private static final int[] PORTRAIT_Y_OFFSETS = { 0, 26, -6 };
+    private static final int[] PREVIEW_ROTATIONS = { 0, 0, 90 };
 
     private final BufferedImage[] portraits = new BufferedImage[3];
     private final BufferedImage[] previews = new BufferedImage[3];
@@ -66,8 +71,8 @@ public class CharacterSelectScreen extends JPanel {
 
     private void loadImages() {
         for (int i = 0; i < 3; i++) {
-            portraits[i] = loadPortrait(PORTRAIT_PATHS[i], 148, 148);
-            previews[i] = loadPrepared(PREVIEW_PATHS[i], 330, 430, false);
+            portraits[i] = loadPortrait(PORTRAIT_PATHS[i], 148, 148, i);
+            previews[i] = loadPrepared(PREVIEW_PATHS[i], 330, 430, false, PREVIEW_ROTATIONS[i]);
             if (previews[i] == null) {
                 previews[i] = loadPrepared(PORTRAIT_PATHS[i], 330, 430, false);
             }
@@ -447,26 +452,43 @@ public class CharacterSelectScreen extends JPanel {
     }
 
     private BufferedImage loadPrepared(String path, int outW, int outH, boolean fillSquare) {
+        return loadPrepared(path, outW, outH, fillSquare, 0);
+    }
+
+    private BufferedImage loadPrepared(String path, int outW, int outH, boolean fillSquare, int rotationDegrees) {
         try {
             BufferedImage src = ImageIO.read(new File(path));
             if (src == null) return null;
+            if (rotationDegrees == 90) {
+                src = rotateClockwise(src);
+            }
             return prepareImage(src, outW, outH, fillSquare);
         } catch (Exception e) {
             return null;
         }
     }
 
-    private BufferedImage loadPortrait(String path, int outW, int outH) {
+    private BufferedImage rotateClockwise(BufferedImage src) {
+        BufferedImage rotated = new BufferedImage(src.getHeight(), src.getWidth(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = rotated.createGraphics();
+        g2.translate(src.getHeight(), 0);
+        g2.rotate(Math.toRadians(90));
+        g2.drawImage(src, 0, 0, null);
+        g2.dispose();
+        return rotated;
+    }
+
+    private BufferedImage loadPortrait(String path, int outW, int outH, int characterIndex) {
         try {
             BufferedImage src = ImageIO.read(new File(path));
             if (src == null) return null;
-            return preparePortrait(src, outW, outH);
+            return preparePortrait(src, outW, outH, characterIndex);
         } catch (Exception e) {
             return null;
         }
     }
 
-    private BufferedImage preparePortrait(BufferedImage src, int outW, int outH) {
+    private BufferedImage preparePortrait(BufferedImage src, int outW, int outH, int characterIndex) {
         BufferedImage argb = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
         Graphics2D tmp = argb.createGraphics();
         tmp.drawImage(src, 0, 0, null);
@@ -481,11 +503,15 @@ public class CharacterSelectScreen extends JPanel {
         Graphics2D g2 = out.createGraphics();
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
-        double scale = Math.max((double)outW / cropped.getWidth(), (double)outH / cropped.getHeight()) * 1.35;
+        double portraitScale = PORTRAIT_SCALE_MULTIPLIERS[Math.max(0, Math.min(characterIndex, PORTRAIT_SCALE_MULTIPLIERS.length - 1))];
+        int offsetX = PORTRAIT_X_OFFSETS[Math.max(0, Math.min(characterIndex, PORTRAIT_X_OFFSETS.length - 1))];
+        int offsetY = PORTRAIT_Y_OFFSETS[Math.max(0, Math.min(characterIndex, PORTRAIT_Y_OFFSETS.length - 1))];
+
+        double scale = Math.max((double)outW / cropped.getWidth(), (double)outH / cropped.getHeight()) * portraitScale;
         int drawW = Math.max(1, (int)Math.round(cropped.getWidth() * scale));
         int drawH = Math.max(1, (int)Math.round(cropped.getHeight() * scale));
-        int drawX = (outW - drawW) / 2;
-        int drawY = (int)Math.round(outH * 0.58 - drawH * 0.42);
+        int drawX = (outW - drawW) / 2 + offsetX;
+        int drawY = (int)Math.round(outH * 0.58 - drawH * 0.42) + offsetY;
         g2.drawImage(cropped, drawX, drawY, drawW, drawH, null);
         g2.dispose();
         return out;

@@ -187,12 +187,12 @@ public class SettingsScreen extends JPanel {
         int bkW = 140, bkH = 40;
         int bkX = panelX + 40;
         backRect = new Rectangle(bkX, btnY, bkW, bkH);
-        drawActionButton(g2, "◄  BACK", bkX, btnY, bkW, bkH, backHovered);
+        drawActionButton(g2, "BACK", bkX, btnY, bkW, bkH, backHovered);
 
         int apW = 160, apH = 40;
         int apX = panelX + panelW - 40 - apW;
         applyRect = new Rectangle(apX, btnY, apW, apH);
-        drawActionButton(g2, "APPLY  ✓", apX, btnY, apW, apH, applyHovered);
+        drawActionButton(g2, "APPLY", apX, btnY, apW, apH, applyHovered);
 
         g2.dispose();
     }

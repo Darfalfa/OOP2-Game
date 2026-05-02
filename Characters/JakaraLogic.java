@@ -104,7 +104,7 @@ public class JakaraLogic extends Character {
     @Override
     public int getSkillFrameWidth(int skillNumber) {
         return switch (skillNumber) {
-            case 1 -> 961;
+            case 1 -> 1012;
             case 2 -> 1016;
             case 3 -> 519;
             default -> 0;
@@ -124,7 +124,7 @@ public class JakaraLogic extends Character {
     @Override
     public int getSkillMaxFrames(int skillNumber) {
         return switch (skillNumber) {
-            case 1 -> 20;
+            case 1 -> 19;
             case 2 -> 19;
             case 3 -> 25;
             default -> 1;

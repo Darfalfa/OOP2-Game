@@ -301,7 +301,7 @@ public class GameScreen extends JPanel implements Runnable {
                         return;
                     }
                     if (gameSettingsCloseBtn != null && gameSettingsCloseBtn.contains(p)) {
-                        settingsOpen = false;
+                        closeGameSettings();
                         repaint();
                         return;
                     }
@@ -352,7 +352,7 @@ public class GameScreen extends JPanel implements Runnable {
                 }
 
                 if (settingsBtnRect != null && settingsBtnRect.contains(e.getPoint())) {
-                    settingsOpen = true;
+                    openGameSettings();
                     repaint();
                     return;
                 }
@@ -470,6 +470,31 @@ public class GameScreen extends JPanel implements Runnable {
 
     public boolean isStoryOpen() {
         return storyOpen;
+    }
+
+    public boolean isSettingsOpen() {
+        return settingsOpen;
+    }
+
+    private void openGameSettings() {
+        settingsOpen = true;
+        clearMovementInput();
+        requestFocusInWindow();
+    }
+
+    private void closeGameSettings() {
+        settingsOpen = false;
+        clearMovementInput();
+        requestFocusInWindow();
+    }
+
+    private void clearMovementInput() {
+        if (keyH == null) return;
+
+        keyH.upPressed = false;
+        keyH.downPressed = false;
+        keyH.leftPressed = false;
+        keyH.rightPressed = false;
     }
 
     public void closeStory() {
@@ -967,6 +992,11 @@ public class GameScreen extends JPanel implements Runnable {
         if (creditsOpen) return;
 
         if (inBattle) return;
+
+        if (settingsOpen) {
+            clearMovementInput();
+            return;
+        }
 
         if (postBattleCooldown > 0) {
             postBattleCooldown--;
