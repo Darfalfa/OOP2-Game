@@ -1,4 +1,3 @@
-import Characters.Character;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -15,7 +14,7 @@ public class Enemy {
     public int x, y;
     public static final int W = 48, H = 48;
 
-    public Character character;
+    public Characters.Character character;
 
     private BufferedImage spriteSheet;
 
@@ -37,7 +36,7 @@ public class Enemy {
 
     public int respawnTimer = 0;
 
-    public Enemy(int x, int y, Character character, GameScreen gp) {
+    public Enemy(int x, int y, Characters.Character character, GameScreen gp) {
         this.x = x;
         this.y = y;
         this.character = character;

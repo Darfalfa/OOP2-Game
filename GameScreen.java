@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
 
+
 /**
  * GameScreen — gameplay panel adapted to your current project structure.
  * Uses map.txt + tiledata.txt + tile images from your tiles folder.
@@ -458,21 +459,21 @@ public class GameScreen extends JPanel implements Runnable {
         }
 
         if (world == 2) {
-            mapBackground.loadMap("tiles/world2/map2.png");
-            collisionManager = new CollisionManager("maps/Detailed_Map2_Collision.tmx");
+            mapBackground.loadMap("tiles/world2/World 2.png");
+            collisionManager = new CollisionManager("maps/World 2.tmx");
             playMusic("world2.wav"); //placeholder
 
-            player.x = 800;
-            player.y = 982;
+            player.x = 100;
+            player.y = 670;
         }
 
         if (world == 3) {
-            mapBackground.loadMap("tiles/world3/map3.png");
-            collisionManager = new CollisionManager("maps/Detailed_Map3_Collision.tmx");
-            playMusic("world1.wav"); //placeholder
+            mapBackground.loadMap("tiles/world3/World 3.png");
+            collisionManager = new CollisionManager("maps/World 3.tmx");
+            playMusic("world3.wav"); //placeholder
 
-            player.x = 3024;
-            player.y = 1584;
+            player.x = 1456;
+            player.y = 500;
         }
 
         worldWidth = mapBackground.worldWidth;
