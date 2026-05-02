@@ -1338,7 +1338,7 @@ public class BattleScreen extends JPanel {
         if (isBloodmancer()) {
             drawW = baseW;
             drawH = baseH;
-        } else if (enemyCharacter.isFinalBoss()) {
+        } else if (skillByEnemy && enemyCharacter.isFinalBoss()) {
             // Force the height to match the original idle height
             double aspect = (double) skillFrameWidth / skillFrameHeight;
             drawH = baseH;

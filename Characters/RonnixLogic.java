@@ -137,7 +137,9 @@ public class RonnixLogic extends Character {
     @Override
     public double getSkillRenderScale(int skillNumber) {
         return switch (skillNumber) {
-            case 3 -> 0.55;
+            case 1 -> 2.8;
+            case 2 -> 2.8;
+            case 3 -> 2.5;
             default -> 1.0;
         };
     }
@@ -145,11 +147,10 @@ public class RonnixLogic extends Character {
     @Override
     public int getSkillVerticalOffset(int skillNumber) {
         return switch (skillNumber) {
-            case 3 -> -210;
+            case 3 -> -80;
             default -> 0;
         };
     }
-
     @Override
     public int getVerticalOffset() {
         return 30;

@@ -138,7 +138,9 @@ public class AyaLogic extends Character {
     @Override
     public double getSkillRenderScale(int skillNumber) {
         return switch (skillNumber) {
-            case 3 -> 0.55;
+            case 1 -> 4.0;
+            case 2 -> 4.0;
+            case 3 -> 3.0;
             default -> 1.0;
         };
     }
