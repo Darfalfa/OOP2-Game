@@ -94,4 +94,80 @@ public class AyaLogic extends Character {
                 return "0";
         }
     }
+
+    @Override
+    public String getSkillSprite(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> "images/Aya_ChasingArrow.png";
+            case 2 -> "images/Aya_MetalRain.png";
+            case 3 -> "images/Aya_SagittariusPunishment.png";
+            default -> null;
+        };
+    }
+
+    @Override
+    public int getSkillFrameWidth(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 1013;
+            case 2 -> 970;
+            case 3 -> 964;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillFrameHeight(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 644;
+            case 2 -> 647;
+            case 3 -> 640;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillMaxFrames(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 16;
+            case 2 -> 20;
+            case 3 -> 20;
+            default -> 1;
+        };
+    }
+
+    @Override
+    public double getSkillRenderScale(int skillNumber) {
+        return switch (skillNumber) {
+            case 3 -> 0.55;
+            default -> 1.0;
+        };
+    }
+
+    @Override
+    public int getSkillVerticalOffset(int skillNumber) {
+        return switch (skillNumber) {
+            case 3 -> -210;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getVerticalOffset() {
+        return 30;
+    }
+
+    @Override
+    public double getScale() {
+        return 0.66;
+    }
+
+    @Override
+    public double getWorldMapScale() {
+        return 1.20;
+    }
+
+    @Override
+    public int getWorldMapVerticalOffset() {
+        return 65;
+    }
 }

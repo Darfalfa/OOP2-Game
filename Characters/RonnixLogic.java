@@ -94,5 +94,80 @@ public class RonnixLogic extends Character {
         }
     }
 
+    @Override
+    public String getSkillSprite(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> "images/Ronnix_SwordSlash.png";
+            case 2 -> "images/Ronnix_DeathThrust.png";
+            case 3 -> "images/Ronnix_DivineStrike.png";
+            default -> null;
+        };
+    }
+
+    @Override
+    public int getSkillFrameWidth(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 639;
+            case 2 -> 639;
+            case 3 -> 639;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillFrameHeight(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 549;
+            case 2 -> 617;
+            case 3 -> 605;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillMaxFrames(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 30;
+            case 2 -> 30;
+            case 3 -> 25;
+            default -> 1;
+        };
+    }
+
+    @Override
+    public double getSkillRenderScale(int skillNumber) {
+        return switch (skillNumber) {
+            case 3 -> 0.55;
+            default -> 1.0;
+        };
+    }
+
+    @Override
+    public int getSkillVerticalOffset(int skillNumber) {
+        return switch (skillNumber) {
+            case 3 -> -210;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getVerticalOffset() {
+        return 30;
+    }
+
+    @Override
+    public double getScale() {
+        return 0.66;
+    }
+
+    @Override
+    public double getWorldMapScale() {
+        return 1.20;
+    }
+
+    @Override
+    public int getWorldMapVerticalOffset() {
+        return 65;
+    }
 
 }

@@ -105,6 +105,8 @@ public class BattleScreen extends JPanel {
     private int skillAnimTicks = 0;
     private int activeSkillNumber = 0;
     private boolean skillOnEnemy = false;
+    private boolean skillByEnemy = false;
+
 
     // Snapshot of the enemy's draw position at the moment a skill fires.
     // Used so the skill animation stays locked to the same spot as the idle sprite.
@@ -112,6 +114,11 @@ public class BattleScreen extends JPanel {
     private int frozenEnemyY = 0;
     private int frozenEnemyW = 0;
     private int frozenEnemyH = 0;
+
+    private int frozenPlayerX = 0;
+    private int frozenPlayerY = 0;
+    private int frozenPlayerW = 0;
+    private int frozenPlayerH = 0;
 
     // Per-character battle sprites (loaded once, swapped on character change)
     private BufferedImage ayaBattleSprite;
@@ -379,7 +386,8 @@ public class BattleScreen extends JPanel {
         // Boss/enemy skill animations always play on the enemy side (right),
         // centred on the enemy sprite — they are visual effects emanating FROM
         // the boss, not a projectile hitting the player.
-        skillOnEnemy = true;
+        skillByEnemy = attackerIsEnemy;
+        skillOnEnemy = attackerIsEnemy;
 
         // Always reset to frame 0 so every skill starts from the beginning.
         skillFrame     = 0;
@@ -566,6 +574,8 @@ public class BattleScreen extends JPanel {
         }
 
         int dmg = playerCharacter.useSkill(skillNumber, enemyCharacter);
+
+        playSkillAnimation(playerCharacter, skillNumber, false);
 
         addLog(playerCharacter.getName() + " used " + playerCharacter.getSkillName(skillNumber) + "!");
         addLog("Dealt " + dmg + " damage!");
@@ -947,6 +957,13 @@ public class BattleScreen extends JPanel {
         int px = centerX - pW / 2;
         int py = groundY - pH - 5;
 
+        if (!(skillAnimTicks > 0 && !skillByEnemy)) {
+            frozenPlayerX = px;
+            frozenPlayerY = py;
+            frozenPlayerW = pW;
+            frozenPlayerH = pH;
+        }
+
         int offX = (playerShake && shakeTicks > 0) ? (int)shakeX : 0;
 
         BufferedImage sprite = currentPlayerSprite();
@@ -1308,25 +1325,31 @@ public class BattleScreen extends JPanel {
 
         // 1. Define the PIVOT point (The feet/center of the character)
         // We use the static coordinates captured when the skill started
-        int pivotX = frozenEnemyX + (frozenEnemyW / 2);
-        int pivotY = frozenEnemyY + frozenEnemyH;
+        int baseX = skillByEnemy ? frozenEnemyX : frozenPlayerX;
+        int baseY = skillByEnemy ? frozenEnemyY : frozenPlayerY;
+        int baseW = skillByEnemy ? frozenEnemyW : frozenPlayerW;
+        int baseH = skillByEnemy ? frozenEnemyH : frozenPlayerH;
+
+        int pivotX = baseX + (baseW / 2);
+        int pivotY = baseY + baseH;
 
         // 2. Calculate dimensions
         int drawW, drawH;
         if (isBloodmancer()) {
-            drawW = frozenEnemyW;
-            drawH = frozenEnemyH;
+            drawW = baseW;
+            drawH = baseH;
         } else if (enemyCharacter.isFinalBoss()) {
             // Force the height to match the original idle height
             double aspect = (double) skillFrameWidth / skillFrameHeight;
-            drawH = frozenEnemyH;
+            drawH = baseH;
             drawW = (int)(drawH * aspect);
         } else {
-            drawW = frozenEnemyW;
-            drawH = frozenEnemyH;
+            drawW = baseW;
+            drawH = baseH;
         }
 
-        double skillRenderScale = enemyCharacter.getSkillRenderScale(activeSkillNumber);
+        Character skillOwner = skillByEnemy ? enemyCharacter : playerCharacter;
+        double skillRenderScale = skillOwner.getSkillRenderScale(activeSkillNumber);
         drawW = (int)(drawW * skillRenderScale);
         drawH = (int)(drawH * skillRenderScale);
 
@@ -1335,8 +1358,8 @@ public class BattleScreen extends JPanel {
         // drawY: Bottom-align the sprite at the pivot
         int drawX = pivotX - (drawW / 2);
         int drawY = pivotY - drawH;
-        int horizontalOffset = enemyCharacter.getSkillHorizontalOffset(activeSkillNumber);
-        int verticalOffset = enemyCharacter.getSkillVerticalOffset(activeSkillNumber);
+        int horizontalOffset = skillOwner.getSkillHorizontalOffset(activeSkillNumber);
+        int verticalOffset = skillOwner.getSkillVerticalOffset(activeSkillNumber);
         drawX += (int)(horizontalOffset * ((double) drawW / skillFrameWidth));
         drawY += (int)(verticalOffset * ((double) drawH / skillFrameHeight));
 
