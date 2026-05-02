@@ -60,7 +60,6 @@ public class ShadowLogic extends Character {
         }
     }
 
-    //placeholder
     @Override
     public String getSkillSfx(int skillNumber) {
         return switch (skillNumber) {

@@ -13,9 +13,6 @@ public class SettingsScreen extends JPanel {
     private static final Color DARK_BG    = new Color(12, 6, 4);
 
     // Sliders
-    private int musicVol  = 80;
-    private int sfxVol    = 70;
-    private boolean fullscreen = false;
 
     private Rectangle musicSlider, sfxSlider;
     private Rectangle musicTrack, sfxTrack;
@@ -57,14 +54,14 @@ public class SettingsScreen extends JPanel {
             public void mouseDragged(MouseEvent e) {
                 if ("music".equals(dragging) && musicTrack != null) {
                     int val = (int)(100.0 * (e.getX() - musicTrack.x) / musicTrack.width);
-                    musicVol = Math.max(0, Math.min(100, val));
-                    SoundManager.setMusicVolume(musicVol / 100f);
+                    window.musicVol = Math.max(0, Math.min(100, val));
+                    SoundManager.setMusicVolume(window.musicVol / 100f);
                     repaint();
 
                 } else if ("sfx".equals(dragging) && sfxTrack != null) {
                     int val = (int)(100.0 * (e.getX() - sfxTrack.x) / sfxTrack.width);
-                    sfxVol = Math.max(0, Math.min(100, val));
-                    SoundManager.setSfxVolume(sfxVol / 100f);
+                    window.sfxVol = Math.max(0, Math.min(100, val));
+                    SoundManager.setSfxVolume(window.sfxVol / 100f);
                     repaint();
                 }
             }
@@ -83,8 +80,8 @@ public class SettingsScreen extends JPanel {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (fullBtn != null && fullBtn.contains(e.getPoint())) {
-                    fullscreen = !fullscreen;
-                    window.setFullscreen(fullscreen);
+                    window.fullscreen = !window.fullscreen;
+                    window.setFullscreen(window.fullscreen);
                     repaint();
                     return;
                 }
@@ -95,8 +92,8 @@ public class SettingsScreen extends JPanel {
                 }
 
                 if (applyRect != null && applyRect.contains(e.getPoint())) {
-                    SoundManager.setMusicVolume(musicVol / 100f);
-                    SoundManager.setSfxVolume(sfxVol / 100f);
+                    SoundManager.setMusicVolume(window.musicVol / 100f);
+                    SoundManager.setSfxVolume(window.sfxVol / 100f);
 
                     window.showMainMenu(); 
                 }
@@ -156,31 +153,31 @@ public class SettingsScreen extends JPanel {
         int ry = panelY + 80;
 
         // Music volume
-        ry = drawSliderRow(g2, "MUSIC VOLUME", musicVol, rowX, ry, rowW, true);
+        ry = drawSliderRow(g2, "MUSIC VOLUME", window.musicVol, rowX, ry, rowW, true);
         musicTrack = new Rectangle(rowX + 160, ry - 32, rowW - 160, 16);
-        musicSlider = new Rectangle((int)(musicTrack.x + musicTrack.width * musicVol / 100.0) - 8, ry - 40, 16, 32);
+        musicSlider = new Rectangle((int)(musicTrack.x + musicTrack.width * window.musicVol / 100.0) - 8, ry - 40, 16, 32);
 
         // SFX volume
         ry += 10;
-        ry = drawSliderRow(g2, "SFX VOLUME", sfxVol, rowX, ry, rowW, false);
+        ry = drawSliderRow(g2, "SFX VOLUME", window.sfxVol, rowX, ry, rowW, false);
         sfxTrack = new Rectangle(rowX + 160, ry - 32, rowW - 160, 16);
-        sfxSlider = new Rectangle((int)(sfxTrack.x + sfxTrack.width * sfxVol / 100.0) - 8, ry - 40, 16, 32);
+        sfxSlider = new Rectangle((int)(sfxTrack.x + sfxTrack.width * window.sfxVol / 100.0) - 8, ry - 40, 16, 32);
 
         // Fullscreen toggle
         drawLabel(g2, "FULLSCREEN", rowX, ry);
         int tbX = rowX + 160, tbY = ry - 24, tbW = 60, tbH = 28;
         fullBtn = new Rectangle(tbX, tbY, tbW, tbH);
-        g2.setColor(fullscreen ? new Color(80,45,10,220) : new Color(20,10,5,180));
+        g2.setColor(window.fullscreen ? new Color(80,45,10,220) : new Color(20,10,5,180));
         g2.fillRoundRect(tbX, tbY, tbW, tbH, tbH, tbH);
-        g2.setColor(fullscreen ? GOLD_LIGHT : GOLD_DARK);
+        g2.setColor(window.fullscreen ? GOLD_LIGHT : GOLD_DARK);
         g2.setStroke(new BasicStroke(1.5f));
         g2.drawRoundRect(tbX, tbY, tbW, tbH, tbH, tbH);
-        int knobX = fullscreen ? tbX + tbW - tbH + 3 : tbX + 3;
-        g2.setColor(fullscreen ? GOLD_LIGHT : new Color(80,50,20));
+        int knobX = window.fullscreen ? tbX + tbW - tbH + 3 : tbX + 3;
+        g2.setColor(window.fullscreen ? GOLD_LIGHT : new Color(80,50,20));
         g2.fillOval(knobX, tbY + 3, tbH - 6, tbH - 6);
         Font tl = new Font("Serif", Font.BOLD, 12);
         g2.setFont(tl); g2.setColor(GOLD);
-        g2.drawString(fullscreen ? "ON" : "OFF", tbX + tbW + 12, ry - 5);
+        g2.drawString(window.fullscreen ? "ON" : "OFF", tbX + tbW + 12, ry - 5);
 
         // Buttons
         int btnY = panelY + panelH - 60;

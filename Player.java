@@ -67,7 +67,7 @@ public abstract class Player {
         this.keyH = keyH;
         x     = gp.getWorldWidth()  / 2;
         y     = gp.getWorldHeight() / 2;
-        speed = 12;
+        speed = 3;
         loadSprites();
         currentSprite = standingForward;
     }

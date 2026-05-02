@@ -77,7 +77,7 @@ public class GameScreen extends JPanel implements Runnable {
 
     // enemies
     private final List<Enemy> enemies = new ArrayList<>();
-    private static final int ENEMY_COUNT = 10;
+    private static final int ENEMY_COUNT = 4;
     private int lastPlayerLevel = -1;
     private boolean bossSpawned = false;
     private boolean finalBossDefeated = false;
@@ -111,9 +111,6 @@ public class GameScreen extends JPanel implements Runnable {
     private Rectangle settingsBtnRect;
     private boolean settingsBtnHovered = false;
     private boolean settingsOpen = false;
-    private int gameMusicVol = 80;
-    private int gameSfxVol = 70;
-    private boolean gameFullscreen = false;
     private Rectangle gameMusicTrack, gameSfxTrack, gameMusicSlider, gameSfxSlider;
     private Rectangle gameFullscreenBtn, gameSettingsCloseBtn;
     private String gameSettingsDragging = null;
@@ -293,12 +290,12 @@ public class GameScreen extends JPanel implements Runnable {
             public void mouseDragged(MouseEvent e) {
                 if (!settingsOpen) return;
                 if ("music".equals(gameSettingsDragging) && gameMusicTrack != null) {
-                    gameMusicVol = sliderValue(e.getX(), gameMusicTrack);
-                    SoundManager.setMusicVolume(gameMusicVol / 100f);
+                    window.musicVol = sliderValue(e.getX(), gameMusicTrack);
+                    SoundManager.setMusicVolume(window.musicVol / 100f);
                     repaint();
                 } else if ("sfx".equals(gameSettingsDragging) && gameSfxTrack != null) {
-                    gameSfxVol = sliderValue(e.getX(), gameSfxTrack);
-                    SoundManager.setSfxVolume(gameSfxVol / 100f);
+                    window.sfxVol = sliderValue(e.getX(), gameSfxTrack);
+                    SoundManager.setSfxVolume(window.sfxVol / 100f);
                     repaint();
                 }
             }
@@ -323,8 +320,8 @@ public class GameScreen extends JPanel implements Runnable {
                 Point p = e.getPoint();
                 if (settingsOpen) {
                     if (gameFullscreenBtn != null && gameFullscreenBtn.contains(p)) {
-                        gameFullscreen = !gameFullscreen;
-                        window.setFullscreen(gameFullscreen);
+                        window.fullscreen = !window.fullscreen;
+                        window.setFullscreen(window.fullscreen);
                         repaint();
                         return;
                     }
@@ -379,11 +376,17 @@ public class GameScreen extends JPanel implements Runnable {
 
                 if (wensDialogueOpen) {
                     wensDialogueOpen = false;
+                    clearMovementInput();
+                    requestFocusInWindow();
+                    repaint();
                     return;
                 }
 
                 if (khaiDialogueOpen) {
                     khaiDialogueOpen = false;
+                    clearMovementInput();
+                    SwingUtilities.invokeLater(() -> requestFocusInWindow());
+                    repaint();
                     return;
                 }
 
@@ -401,12 +404,20 @@ public class GameScreen extends JPanel implements Runnable {
                 if (nextLevelBtn != null && nextLevelBtn.contains(p)) {
 
                     if (playerCharacter != null) {
+                        int oldLevel = playerCharacter.getLevel();
+                        int targetLevel = oldLevel + 1;
+
+                        awardDebugPuzzlePieceForLevel(targetLevel);
+
+
                         int needed = playerCharacter.getNextLevelXp();
                         int current = playerCharacter.getCurrentXp();
                         int give = needed - current + 1;
                         playerCharacter.gainXp(give);
                     }
 
+                    clearMovementInput();
+                    requestFocusInWindow();
                     repaint();
                     return;
                 }
@@ -499,6 +510,24 @@ public class GameScreen extends JPanel implements Runnable {
 
     }
 
+    private void awardDebugPuzzlePieceForLevel(int level) {
+        if (level > 3) {
+            awardPuzzlePiece(1, 3);
+        }
+
+        if (level > 5) {
+            awardPuzzlePiece(2, 2);
+        }
+
+        if (level >6) {
+            awardPuzzlePiece(2, 3);
+        }
+
+        if (level >8) {
+            awardPuzzlePiece(3, 2);
+        }
+    }
+
     public void showStory(String id) {
         wensDialogueOpen = false;
         khaiDialogueOpen = false;
@@ -552,6 +581,9 @@ public class GameScreen extends JPanel implements Runnable {
         storyOpen = false;
         currentStory = "";
         currentStoryId = "";
+
+        clearMovementInput();
+        requestFocusInWindow();
 
         if (endingChosen &&
                 ("ENDING_RESTORE".equals(closedStoryId) || "ENDING_REPLACE".equals(closedStoryId))) {
@@ -720,6 +752,17 @@ public class GameScreen extends JPanel implements Runnable {
             dungeonIntroPopupOpen = false;
             dungeonIntroPopupImage = null;
             dungeonIntroPopupUsesPuzzleStyle = false;
+
+            if (currentWorld == 3 &&
+                    dungeonManager.getCurrentDungeon() == 3 &&
+                    playerCharacter != null &&
+                    playerCharacter.getLevel() == 9 &&
+                    puzzlePieceCount >= 4 &&
+                    !storyTriggered[9]) {
+
+                showStory("FINAL_BOSS_BEFORE");
+                storyTriggered[9] = true;
+            }
         } else {
             dungeonIntroPopupImage = dungeonIntroQueue.remove(0);
             dungeonIntroPopupUsesPuzzleStyle = !dungeonIntroStyleQueue.isEmpty() && dungeonIntroStyleQueue.remove(0);
@@ -836,8 +879,8 @@ public class GameScreen extends JPanel implements Runnable {
         bossSpawned = false;
         enemies.clear();
 
-        mapBackground.loadMap("tiles/world1/map1.png");
-        collisionManager = new CollisionManager("maps/Detailed_Map1_Collision.tmx");
+        mapBackground.loadMap("tiles/world1/EnhanceMap1.png");
+        collisionManager = new CollisionManager("maps/EnhanceMap1_Collision.tmx");
         worldWidth = mapBackground.worldWidth;
         worldHeight = mapBackground.worldHeight;
         camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
@@ -932,7 +975,22 @@ public class GameScreen extends JPanel implements Runnable {
         int world = currentWorld;
         int dungeonNum = dungeonManager.getCurrentDungeon();
 
-        // Try to spawn minions first
+        if (isMonsterClearLevel()) {
+            String bossType = dungeonManager.getBossType(world, dungeonNum);
+
+            if (bossType != null) {
+                if (world == 3 && dungeonNum == 3 && finalBossDefeated) return;
+                if (bossSpawned) return;
+
+                int[] bossPos = dungeonManager.getBossSpawnPos(world, dungeonNum);
+                spawnDungeonBoss(bossType, bossPos[0], bossPos[1]);
+                bossSpawned = true;
+            }
+
+            return;
+        }
+
+        // Normal dungeon minions
         String minionsType = dungeonManager.getMinionsType(world, dungeonNum);
         int minionsCount = dungeonManager.getMinionsCount(world, dungeonNum);
 
@@ -941,7 +999,7 @@ public class GameScreen extends JPanel implements Runnable {
             spawnDungeonMinions(minionsType, minionsCount, spawnPositions);
         }
 
-        // If no minions, spawn boss instead
+        // Normal boss spawn
         String bossType = dungeonManager.getBossType(world, dungeonNum);
         if (bossType != null) {
             if (world == 3 && dungeonNum == 3 && finalBossDefeated) return;
@@ -1294,6 +1352,10 @@ public class GameScreen extends JPanel implements Runnable {
             postBattleCooldown--;
         }
 
+        if (puzzlePiecePopupOpen) {
+            return;
+        }
+
         if (playerCharacter != null && playerCharacter.getLevel() != lastPlayerLevel) {
             lastPlayerLevel = playerCharacter.getLevel();
 
@@ -1334,10 +1396,6 @@ public class GameScreen extends JPanel implements Runnable {
                 storyTriggered[7] = true;
             }
 
-            if (lvl == 9 && !storyTriggered[9]) {
-                showStory("FINAL_BOSS_BEFORE");
-                storyTriggered[9] = true;
-            }
 
             if ((lvl == 3 || lvl == 6 || lvl == 9) && !khaiDialogueTriggered[lvl]) {
                 if (storyOpen) {
@@ -1395,6 +1453,20 @@ public class GameScreen extends JPanel implements Runnable {
             );
 
             if (exit != null && playerBox.intersects(exit)) {
+
+                if (isCurrentDungeonPuzzleDungeon()
+                        && !hasPuzzlePieceFromCurrentDungeon()) {
+
+                    showKhaiDialogue(
+                            "Wait...\n\n" +
+                                    "You haven't collected the puzzle piece in this dungeon.\n\n" +
+                                    "You may get stuck later if you leave now."
+                    );
+
+                    pushPlayerAwayFromExit(exit);
+                    return;
+                }
+
                 switchToWorld();
                 return;
             }
@@ -1467,6 +1539,65 @@ public class GameScreen extends JPanel implements Runnable {
             blinkTimer = 0;
         }
         if (shopFeedbackTimer > 0) shopFeedbackTimer--;
+    }
+
+    private boolean isCurrentDungeonPuzzleDungeon() {
+        int world = currentWorld;
+        int dungeon = dungeonManager.getCurrentDungeon();
+
+        return (world == 1 && dungeon == 3) ||
+                (world == 2 && dungeon == 2) ||
+                (world == 2 && dungeon == 3) ||
+                (world == 3 && dungeon == 2);
+    }
+
+    private boolean hasPuzzlePieceFromCurrentDungeon() {
+        int world = currentWorld;
+        int dungeon = dungeonManager.getCurrentDungeon();
+
+        if (world == 1 && dungeon == 3) return puzzlePieceCollected[0];
+        if (world == 2 && dungeon == 2) return puzzlePieceCollected[1];
+        if (world == 2 && dungeon == 3) return puzzlePieceCollected[2];
+        if (world == 3 && dungeon == 2) return puzzlePieceCollected[3];
+
+        return true;
+    }
+
+    private void pushPlayerAwayFromExit(Rectangle exit) {
+        int push = tileSize * 2;
+
+        int playerCenterX = player.x + Player.SPRITE_W / 2;
+        int playerCenterY = player.y + Player.SPRITE_H / 2;
+
+        int exitCenterX = exit.x + exit.width / 2;
+        int exitCenterY = exit.y + exit.height / 2;
+
+        int dx = playerCenterX - exitCenterX;
+        int dy = playerCenterY - exitCenterY;
+
+        int oldX = player.x;
+        int oldY = player.y;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+            player.x += dx >= 0 ? push : -push;
+        } else {
+            player.y += dy >= 0 ? push : -push;
+        }
+
+        player.x = Math.max(0, Math.min(player.x, worldWidth - Player.SPRITE_W));
+        player.y = Math.max(0, Math.min(player.y, worldHeight - Player.SPRITE_H));
+
+        if (isTileCollision(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H)) {
+            player.x = oldX;
+            player.y = oldY - push;
+
+            if (isTileCollision(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H)) {
+                player.x = oldX;
+                player.y = oldY + push;
+            }
+        }
+
+        clearMovementInput();
     }
 
     private boolean isBoss(Character character) {
@@ -1973,6 +2104,7 @@ public class GameScreen extends JPanel implements Runnable {
         }, leftColX, startY + 120);
 
         drawCreditSection(g2, "STORY", new String[]{
+                "Abelada, Jackielou C.",
                 "Canillas, Wendel A."
         }, rightColX, startY + 120);
 
@@ -2276,11 +2408,11 @@ public class GameScreen extends JPanel implements Runnable {
             int textMaxW = imgX + imgW - textX - 48;
             drawKhaiWrappedText(g2, khaiDialogueMessage, textX, textStartY, textMaxW);
         } else {
-            g2.drawString("So\u2026 you\u2019ve finally made it this far.",          textX, textStartY);
-            g2.drawString("You\u2019re stronger now\u2014strong enough to face what lies ahead.", textX, textStartY + lineGap);
-            g2.drawString("The Boss Dungeon is open to you.",                         textX, textStartY + lineGap * 2);
-            g2.drawString("\u2026Go on. Step inside.",                                textX, textStartY + lineGap * 3);
-            g2.drawString("I\u2019ll be waiting.",                                    textX, textStartY + lineGap * 4);
+            g2.drawString("So... you've finally made it this far.", textX, textStartY);
+            g2.drawString("You're stronger now—strong enough to face what lies ahead.", textX, textStartY + lineGap);
+            g2.drawString("The boss dungeon is now open.", textX, textStartY + lineGap * 2);
+            g2.drawString("Go on... step inside.", textX, textStartY + lineGap * 3);
+            g2.drawString("The boss awaits.", textX, textStartY + lineGap * 4);
         }
 
         g2.setFont(new Font("Serif", Font.ITALIC, 13));
@@ -2911,23 +3043,24 @@ public class GameScreen extends JPanel implements Runnable {
         int rowX = panelX + 42;
         int rowW = panelW - 84;
         int y = panelY + 100;
-        gameMusicTrack = drawGameSlider(g2, "MUSIC", gameMusicVol, rowX, y, rowW);
-        gameMusicSlider = sliderKnob(gameMusicTrack, gameMusicVol);
+        gameMusicTrack = drawGameSlider(g2, "MUSIC", window.musicVol, rowX, y, rowW);
+        gameMusicSlider = sliderKnob(gameMusicTrack, window.musicVol);
 
         y += 58;
-        gameSfxTrack = drawGameSlider(g2, "SFX", gameSfxVol, rowX, y, rowW);
-        gameSfxSlider = sliderKnob(gameSfxTrack, gameSfxVol);
+
+        gameSfxTrack = drawGameSlider(g2, "SFX", window.sfxVol, rowX, y, rowW);
+        gameSfxSlider = sliderKnob(gameSfxTrack, window.sfxVol);
 
         y += 64;
         g2.setFont(new Font("Serif", Font.BOLD, 16));
         g2.setColor(GOLD);
         g2.drawString("FULLSCREEN", rowX, y);
         gameFullscreenBtn = new Rectangle(rowX + 150, y - 22, 64, 28);
-        g2.setColor(gameFullscreen ? new Color(82, 45, 12) : new Color(22, 12, 8));
+        g2.setColor(window.fullscreen? new Color(82, 45, 12) : new Color(22, 12, 8));
         g2.fillRoundRect(gameFullscreenBtn.x, gameFullscreenBtn.y, gameFullscreenBtn.width, gameFullscreenBtn.height, 28, 28);
-        g2.setColor(gameFullscreen ? GOLD_LIGHT : GOLD_DARK);
+        g2.setColor(window.fullscreen ? GOLD_LIGHT : GOLD_DARK);
         g2.drawRoundRect(gameFullscreenBtn.x, gameFullscreenBtn.y, gameFullscreenBtn.width, gameFullscreenBtn.height, 28, 28);
-        int knobX = gameFullscreen ? gameFullscreenBtn.x + 38 : gameFullscreenBtn.x + 4;
+        int knobX = window.fullscreen ? gameFullscreenBtn.x + 38 : gameFullscreenBtn.x + 4;
         g2.fillOval(knobX, gameFullscreenBtn.y + 4, 20, 20);
 
         gameSettingsCloseBtn = new Rectangle(panelX + panelW - 152, panelY + panelH - 58, 110, 36);

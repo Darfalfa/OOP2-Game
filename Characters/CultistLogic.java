@@ -61,9 +61,9 @@ public class CultistLogic extends Character {
     @Override
     public String getSkillSfx(int skillNumber) {
         return switch (skillNumber) {
-            case 1 -> "Ronnix_SwordSlash.wav";
-            case 2 -> "Ronnix_DeathThrust.wav";
-            case 3 -> "Ronnix_DivineStrike.wav";
+            case 1 -> "Cultist.wav";
+            case 2 -> "Cultist.wav";
+            case 3 -> "Cultist.wav";
             default -> null;
         };
     }

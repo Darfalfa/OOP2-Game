@@ -23,12 +23,17 @@ public class GameWindow extends JFrame {
 
     private String selectedCharacter;
 
+    public int musicVol = 80;
+    public int sfxVol = 70;
+    public boolean fullscreen = false;
+
     public GameWindow() {
         setTitle("Great Ruins of Khai");
         setSize(WIDTH, HEIGHT);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setResizable(true);
-        setMinimumSize(new Dimension(800, 500));
+        setResizable(false);
+        setMinimumSize(new Dimension(WIDTH, HEIGHT));
+        setMaximumSize(new Dimension(WIDTH, HEIGHT));
         setLocationRelativeTo(null);
 
         cardLayout = new CardLayout();
@@ -73,19 +78,18 @@ public class GameWindow extends JFrame {
      * Shows the loading screen first. startGame() will switch to SCREEN_GAME
      * automatically once sprite loading finishes on the background thread.
      */
-public void showGame() {
-    // cardLayout.show(root, SCREEN_LOADING);
-    // loadingScreen.startLoading(() -> {
-    //     SoundManager.stopBgm();
-    //     cardLayout.show(root, SCREEN_GAME);
-    //     gameScreen.startGame();
-    // });
+    public void showGame() {
+        SoundManager.stopBgm();
 
-    // DEBUG: skip loading
-    SoundManager.stopBgm();
-    cardLayout.show(root, SCREEN_GAME);
-    gameScreen.startGame();
-}
+        cardLayout.show(root, SCREEN_LOADING);
+
+        loadingScreen.startLoading(() -> {
+            gameScreen.startGame();
+            cardLayout.show(root, SCREEN_GAME);
+            gameScreen.requestFocusInWindow();
+        });
+    }
+
 
     /**
      * Switch to the battle screen and start a fight against the given enemy.

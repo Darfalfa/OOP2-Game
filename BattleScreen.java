@@ -407,7 +407,6 @@ public class BattleScreen extends JPanel {
             enemyFrame = 0;
         }
 
-        this.enemyCharacter.setLevel(playerCharacter.getLevel());
         this.enemyCharacter.restoreStats();
 
         playerCharacter.resetTurnCounter();

@@ -57,13 +57,12 @@ public class ArmoredGhostLogic extends Character {
         }
     }
 
-    //placeholder
     @Override
     public String getSkillSfx(int skillNumber) {
         return switch (skillNumber) {
-            case 1 -> "Ronnix_SwordSlash.wav";
-            case 2 -> "Ronnix_DeathThrust.wav";
-            case 3 -> "Ronnix_DivineStrike.wav";
+            case 1 -> "Armored.wav";
+            case 2 -> "Armored.wav";
+            case 3 -> "Armored.wav";
             default -> null;
         };
     }

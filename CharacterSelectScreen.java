@@ -159,6 +159,10 @@ public class CharacterSelectScreen extends JPanel {
         backRect = new Rectangle(28, 24, 138, 42);
         playRect = new Rectangle(W - 210, buttonY, 164, 54);
 
+        Character c = CHARACTERS[selectedIndex];
+        Color accent = accentFor(selectedIndex);
+        drawStatBars(g2, c, W - 530, buttonY + 4, 300, accent);
+
         drawBackButton(g2, backRect, backHovered);
         drawPlayButton(g2, playRect, playHovered);
 
@@ -248,14 +252,11 @@ public class CharacterSelectScreen extends JPanel {
         g2.setColor(accent);
         g2.drawString(CLASSES[selectedIndex], panelX + 24, panelY + 66);
 
-        int statY = panelY + 92;
-        drawStatBars(g2, c, panelX + 20, statY, panelW - 40, accent);
     }
 
     private void drawCharacterGrid(Graphics2D g2, int x, int y, int w, int h) {
         g2.setFont(new Font("Serif", Font.BOLD, 22));
         g2.setColor(GOLD_LIGHT);
-        g2.drawString("SELECT LEGEND", x + 8, y - 16);
 
         int cols = 3;
         int gap = 14;
@@ -335,15 +336,20 @@ public class CharacterSelectScreen extends JPanel {
         drawValueLine(g2, "DEF", String.valueOf(c.getMaxDefense()), statX, statY + 24, accent);
         drawValueLine(g2, c.getSkillName(1), c.getSkillDamageRange(1), statX, statY + 58, accent);
         drawValueLine(g2, c.getSkillName(2), c.getSkillDamageRange(2), statX, statY + 82, accent);
-        drawValueLine(g2, c.getSkillName(3), c.getSkillDamageRange(3), statX, statY + 106, accent);
+        drawValueLine(g2, c.getSkillName(3), c.getSkillDamageRange(3), statX, statY + 110, accent);
     }
 
     private void drawValueLine(Graphics2D g2, String label, String value, int x, int y, Color accent) {
         g2.setFont(new Font("Monospaced", Font.BOLD, 14));
+        FontMetrics fm = g2.getFontMetrics();
+
+        int valueX = x + 250; // was 190, gives more space
+
         g2.setColor(new Color(178, 140, 84));
         g2.drawString(label, x, y);
+
         g2.setColor(accent);
-        g2.drawString(value, x + 190, y);
+        g2.drawString(value, valueX, y);
     }
 
     private void drawStatBars(Graphics2D g2, Character c, int x, int y, int w, Color accent) {
