@@ -453,6 +453,7 @@ public class GameScreen extends JPanel implements Runnable {
     private void switchWorld(int world) {
         currentWorld = world;
         inDungeon = false;
+        dungeonManager.exitDungeon();
 
         if (world == 1) {
             mapBackground.loadMap("tiles/world1/EnhanceMap1.png");

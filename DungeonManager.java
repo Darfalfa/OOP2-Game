@@ -66,7 +66,7 @@ public class DungeonManager {
                 926, 690, 926, 
                 880, 100, 50, 
                 460, 562, 
-                460, 466, 80, 80,
+                448, 478, 80, 80,
                 4,
                 "ArmoredGhostSprite", 5, minionPositions(938, 420),
                 null, 0, 0, false  // no boss
@@ -75,7 +75,8 @@ public class DungeonManager {
         // WORLD 2 - DUNGEON 2 (ArmoredGhostSpriteLv2 x5) - Level 5+ required, gives 2nd puzzle piece after all 5 die
         dungeons.put("2-2", new DungeonData(
                 "tiles/world2/World2_D2.png", "maps/World2_D2.tmx",
-                938, 738, 926, 880, 100, 50, 2296, 670, 2296, 562, 80, 80,
+                938, 738, 926, 880, 100, 50, 
+                2296, 670, 2296, 562, 80, 80,
                 5,
                 "ArmoredGhostSpriteLv2", 5, minionPositions(938, 460),
                 null, 0, 0, false  // no boss (minion level dungeon)
@@ -96,7 +97,7 @@ public class DungeonManager {
                 926, 1158, 
                 926, 1302, 
                 100, 50, 796, 665, 
-                808, 560, 80, 80,
+                808, 560, 120, 80,
                 7,
                 "CultistSprite", 5, minionPositions(926, 750),
                 null, 0, 0, false  // no boss
