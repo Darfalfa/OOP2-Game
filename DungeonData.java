@@ -21,11 +21,28 @@ public class DungeonData {
     public int returnX;
     public int returnY;
 
+    // Dungeon access requirement
+    public int requiredLevel;
+
+    // Enemy spawn configuration
+    public String minionsType;      // e.g., "ShadowSprite", "ArmoredGhost", "Cultist"
+    public int minionsCount;        // e.g., 5 minions
+    public int[][] minionSpawnPositions; // placeholder positions for each minion
+
+    // Boss configuration
+    public String bossType;         // e.g., "Noctyx", "Bloodmancer", "Khai"
+    public int bossSpawnX;          // placeholder X for boss
+    public int bossSpawnY;          // placeholder Y for boss
+    public boolean givesPuzzlePiece; // whether beating the boss gives a puzzle piece
+
     public DungeonData(String mapPath, String collisionPath,
                        int enterX, int enterY,
                        int exitX, int exitY, int exitW, int exitH,
                        int returnX, int returnY,
-                       int entranceX, int entranceY, int entranceW, int entranceH) {
+                       int entranceX, int entranceY, int entranceW, int entranceH,
+                       int requiredLevel,
+                       String minionsType, int minionsCount, int[][] minionSpawnPositions,
+                       String bossType, int bossSpawnX, int bossSpawnY, boolean givesPuzzlePiece) {
 
         this.mapPath = mapPath;
         this.collisionPath = collisionPath;
@@ -45,5 +62,16 @@ public class DungeonData {
         this.entranceY = entranceY;
         this.entranceW = entranceW;
         this.entranceH = entranceH;
+
+        this.requiredLevel = requiredLevel;
+        
+        this.minionsType = minionsType;
+        this.minionsCount = minionsCount;
+        this.minionSpawnPositions = minionSpawnPositions;
+
+        this.bossType = bossType;
+        this.bossSpawnX = bossSpawnX;
+        this.bossSpawnY = bossSpawnY;
+        this.givesPuzzlePiece = givesPuzzlePiece;
     }
 }

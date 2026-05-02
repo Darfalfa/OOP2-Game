@@ -1,13 +1,20 @@
 import org.w3c.dom.*;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
+import java.awt.Color;
+import java.awt.Shape;
+import java.awt.geom.*;
 
 public class CollisionManager {
 
     private final Set<Integer> blockedTileIds = new HashSet<>();
     private boolean[][] blocked;
+    
+    // Maps tile GID to list of collision shapes for that tile
+    private Map<Integer, List<Shape>> tileCollisionShapes = new HashMap<>();
+    // Maps world tile position to tile GID
+    private Map<String, Integer> worldTileGids = new HashMap<>();
 
     private int mapCols;
     private int mapRows;
@@ -80,6 +87,9 @@ public class CollisionManager {
                 for (int row = 0; row < mapRows; row++) {
                     for (int col = 0; col < mapCols; col++) {
                         int gid = Integer.parseInt(nums[index].trim());
+                        
+                        // Store the GID at this world position
+                        worldTileGids.put(col + "," + row, gid);
 
                         if (blockedTileIds.contains(gid)) {
                             blocked[col][row] = true;
@@ -113,11 +123,29 @@ public class CollisionManager {
                 Element tile = (Element) tiles.item(i);
 
                 int localId = Integer.parseInt(tile.getAttribute("id"));
+                int gid = firstgid + localId;
 
                 NodeList objectGroups = tile.getElementsByTagName("objectgroup");
 
                 if (objectGroups.getLength() > 0) {
-                    blockedTileIds.add(firstgid + localId);
+                    blockedTileIds.add(gid);
+                    
+                    // Parse actual collision shapes from objectgroup
+                    List<Shape> shapes = new ArrayList<>();
+                    Element objectGroup = (Element) objectGroups.item(0);
+                    NodeList objects = objectGroup.getElementsByTagName("object");
+                    
+                    for (int j = 0; j < objects.getLength(); j++) {
+                        Element obj = (Element) objects.item(j);
+                        Shape shape = parseCollisionObject(obj);
+                        if (shape != null) {
+                            shapes.add(shape);
+                        }
+                    }
+                    
+                    if (!shapes.isEmpty()) {
+                        tileCollisionShapes.put(gid, shapes);
+                    }
                 }
             }
 
@@ -127,6 +155,65 @@ public class CollisionManager {
             System.out.println("Could not load TSX collision: " + tsxFile.getPath());
             e.printStackTrace();
         }
+    }
+
+    private Shape parseCollisionObject(Element obj) {
+        try {
+            // Get base position and size
+            float x = obj.hasAttribute("x") ? Float.parseFloat(obj.getAttribute("x")) : 0;
+            float y = obj.hasAttribute("y") ? Float.parseFloat(obj.getAttribute("y")) : 0;
+            float width = obj.hasAttribute("width") ? Float.parseFloat(obj.getAttribute("width")) : 0;
+            float height = obj.hasAttribute("height") ? Float.parseFloat(obj.getAttribute("height")) : 0;
+            
+            // Check for polygon
+            NodeList polygons = obj.getElementsByTagName("polygon");
+            if (polygons.getLength() > 0) {
+                String points = polygons.item(0).getAttributes().getNamedItem("points").getTextContent();
+                return parsePolygon(points, x, y);
+            }
+            
+            // Check for polyline
+            NodeList polylines = obj.getElementsByTagName("polyline");
+            if (polylines.getLength() > 0) {
+                String points = polylines.item(0).getAttributes().getNamedItem("points").getTextContent();
+                return parsePolyline(points, x, y);
+            }
+            
+            // Default to rectangle
+            if (width > 0 && height > 0) {
+                return new Rectangle2D.Float(x, y, width, height);
+            }
+            
+        } catch (Exception e) {
+            System.out.println("Error parsing collision object: " + e.getMessage());
+        }
+        
+        return null;
+    }
+
+    private Shape parsePolygon(String pointsStr, float offsetX, float offsetY) {
+        String[] points = pointsStr.split(" ");
+        Path2D.Float path = new Path2D.Float();
+        
+        for (int i = 0; i < points.length; i++) {
+            String[] coords = points[i].split(",");
+            float x = Float.parseFloat(coords[0]) + offsetX;
+            float y = Float.parseFloat(coords[1]) + offsetY;
+            
+            if (i == 0) {
+                path.moveTo(x, y);
+            } else {
+                path.lineTo(x, y);
+            }
+        }
+        
+        path.closePath();
+        return path;
+    }
+
+    private Shape parsePolyline(String pointsStr, float offsetX, float offsetY) {
+        // For now, treat polyline as polygon
+        return parsePolygon(pointsStr, offsetX, offsetY);
     }
 
     public boolean isColliding(int x, int y, int width, int height) {
@@ -142,15 +229,57 @@ public class CollisionManager {
         int topRow = y / tileSize;
         int bottomRow = (y + height - 1) / tileSize;
 
+        Rectangle2D.Float playerRect = new Rectangle2D.Float(x, y, width, height);
+
         for (int col = leftCol; col <= rightCol; col++) {
             for (int row = topRow; row <= bottomRow; row++) {
                 if (blocked[col][row]) {
-                    return true;
+                    // Try to get custom collision shapes for this tile
+                    List<Shape> shapes = getCollisionShapesAtTile(col, row);
+                    
+                    if (shapes != null && !shapes.isEmpty()) {
+                        // Check if player rect intersects any custom shape
+                        int tileWorldX = col * tileSize;
+                        int tileWorldY = row * tileSize;
+                        
+                        for (Shape shape : shapes) {
+                            // Translate shape to world coordinates
+                            Area shapeArea = new Area(shape);
+                            shapeArea.transform(AffineTransform.getTranslateInstance(tileWorldX, tileWorldY));
+                            
+                            // Check if player intersects this shape
+                            Area playerArea = new Area(playerRect);
+                            shapeArea.intersect(playerArea);
+                            
+                            if (!shapeArea.isEmpty()) {
+                                return true;
+                            }
+                        }
+                    } else {
+                        // Legacy: no custom shapes, treat entire tile as blocked
+                        return true;
+                    }
                 }
             }
         }
 
         return false;
+    }
+
+    public boolean[][] getBlockedTiles() {
+        return blocked;
+    }
+
+    public int getTileSize() {
+        return tileSize;
+    }
+
+    public int getMapCols() {
+        return mapCols;
+    }
+
+    public int getMapRows() {
+        return mapRows;
     }
 
     private void loadEmbeddedTilesetCollision(Element tileset, int firstgid) {
@@ -160,14 +289,41 @@ public class CollisionManager {
             Element tile = (Element) tiles.item(i);
 
             int localId = Integer.parseInt(tile.getAttribute("id"));
+            int gid = firstgid + localId;
 
             NodeList objectGroups = tile.getElementsByTagName("objectgroup");
 
             if (objectGroups.getLength() > 0) {
-                blockedTileIds.add(firstgid + localId);
+                blockedTileIds.add(gid);
+                
+                // Parse actual collision shapes from objectgroup
+                List<Shape> shapes = new ArrayList<>();
+                Element objectGroup = (Element) objectGroups.item(0);
+                NodeList objects = objectGroup.getElementsByTagName("object");
+                
+                for (int j = 0; j < objects.getLength(); j++) {
+                    Element obj = (Element) objects.item(j);
+                    Shape shape = parseCollisionObject(obj);
+                    if (shape != null) {
+                        shapes.add(shape);
+                    }
+                }
+                
+                if (!shapes.isEmpty()) {
+                    tileCollisionShapes.put(gid, shapes);
+                }
             }
         }
 
         System.out.println("Loaded embedded collision tiles");
+    }
+
+    public List<Shape> getCollisionShapesAtTile(int col, int row) {
+        String key = col + "," + row;
+        Integer gid = worldTileGids.get(key);
+        if (gid != null && tileCollisionShapes.containsKey(gid)) {
+            return tileCollisionShapes.get(gid);
+        }
+        return null;
     }
 }

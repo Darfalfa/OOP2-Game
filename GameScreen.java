@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
 
+
 /**
  * GameScreen — gameplay panel adapted to your current project structure.
  * Uses map.txt + tiledata.txt + tile images from your tiles folder.
@@ -13,6 +14,7 @@ import javax.swing.*;
 public class GameScreen extends JPanel implements Runnable {
 
     private GameWindow window;
+    private int spawnFreezeFrames = 0;
 
     public static final int SCREEN_WIDTH  = GameWindow.WIDTH;
     public static final int SCREEN_HEIGHT = GameWindow.HEIGHT;
@@ -41,6 +43,7 @@ public class GameScreen extends JPanel implements Runnable {
     int worldHeight;
 
     private CollisionManager collisionManager;
+    private boolean showCollisionDebug = false;
 
     private boolean inDungeon = false;
 
@@ -77,6 +80,21 @@ public class GameScreen extends JPanel implements Runnable {
     private static final int ENEMY_COUNT = 10;
     private int lastPlayerLevel = -1;
     private boolean bossSpawned = false;
+    private boolean finalBossDefeated = false;
+
+    // Puzzle pieces
+    private int puzzlePieceCount = 0;
+    private boolean[] puzzlePieceCollected = new boolean[4]; // 4 puzzle pieces total
+    private Image[] puzzlePieceImages = new Image[4];
+    private boolean puzzlePiecePopupOpen = false;
+    private Image puzzlePiecePopupImage;
+    private String puzzlePiecePopupText = "";
+    private Image[] dungeonIntroImages = new Image[4];
+    private boolean dungeonIntroPopupOpen = false;
+    private Image dungeonIntroPopupImage;
+    private boolean dungeonIntroPopupUsesPuzzleStyle = false;
+    private final List<Image> dungeonIntroQueue = new ArrayList<>();
+    private final List<Boolean> dungeonIntroStyleQueue = new ArrayList<>();
 
     private Character playerCharacter;
 
@@ -142,6 +160,8 @@ public class GameScreen extends JPanel implements Runnable {
     private boolean khaiDialogueOpen = false;
     private Image khaiDialogueImg;
     private boolean[] khaiDialogueTriggered = new boolean[10];
+    private String khaiDialogueMessage = "";
+    private int blockedDungeonWarning = 0;
 
     // Feedback message shown at the top of the shop (not blocking buttons)
     private String shopFeedback = "";
@@ -176,12 +196,12 @@ public class GameScreen extends JPanel implements Runnable {
         addKeyListener(keyH);
 
         mapBackground = new MapBackground();
-        mapBackground.loadMap("tiles/world1/map1.png");
+        mapBackground.loadMap("tiles/world1/EnhanceMap1.png");
 
         worldWidth = mapBackground.worldWidth;
         worldHeight = mapBackground.worldHeight;
 
-        collisionManager = new CollisionManager("maps/Detailed_Map1_Collision.tmx");
+        collisionManager = new CollisionManager("maps/EnhanceMap1_Collision.tmx");
 
         dungeonManager = new DungeonManager();
 
@@ -202,6 +222,14 @@ public class GameScreen extends JPanel implements Runnable {
             wensDialogueImg = new ImageIcon("images/Wens_dialogue.png").getImage();
             khaiDialogueImg = new ImageIcon("images/Khai_dialogue.png").getImage();
             creditsBG = new ImageIcon("images/CreditsBG.png").getImage();
+            puzzlePieceImages[0] = new ImageIcon("images/Puzzle_A.png").getImage();
+            puzzlePieceImages[1] = new ImageIcon("images/Puzzle_K.png").getImage();
+            puzzlePieceImages[2] = new ImageIcon("images/Puzzle_H.png").getImage();
+            puzzlePieceImages[3] = new ImageIcon("images/Puzzle_I.png").getImage();
+            dungeonIntroImages[0] = new ImageIcon("images/B1_Intro.png").getImage();
+            dungeonIntroImages[1] = new ImageIcon("images/B2_Intro.png").getImage();
+            dungeonIntroImages[2] = new ImageIcon("images/B3_Intro.png").getImage();
+            dungeonIntroImages[3] = new ImageIcon("images/Puzzle_Complete.png").getImage();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -333,6 +361,19 @@ public class GameScreen extends JPanel implements Runnable {
 
                 if (storyOpen) {
                     closeStory();
+                    return;
+                }
+
+                if (puzzlePiecePopupOpen) {
+                    puzzlePiecePopupOpen = false;
+                    puzzlePiecePopupImage = null;
+                    puzzlePiecePopupText = "";
+                    repaint();
+                    return;
+                }
+
+                if (dungeonIntroPopupOpen) {
+                    advanceDungeonIntroPopup();
                     return;
                 }
 
@@ -468,6 +509,14 @@ public class GameScreen extends JPanel implements Runnable {
         storyOpen = true;
     }
 
+    private void showKhaiDialogue(String message) {
+        wensDialogueOpen = false;
+        shopDialogueOpen = false;
+        khaiDialogueMessage = message == null ? "" : message;
+        khaiDialogueOpen = true;
+        repaint();
+    }
+
     public boolean isStoryOpen() {
         return storyOpen;
     }
@@ -519,7 +568,7 @@ public class GameScreen extends JPanel implements Runnable {
         }
 
         if (showKhaiAfterStory) {
-            khaiDialogueOpen = true;
+            showKhaiDialogue("");
             showKhaiAfterStory = false;
         }
     }
@@ -546,31 +595,32 @@ public class GameScreen extends JPanel implements Runnable {
     private void switchWorld(int world) {
         currentWorld = world;
         inDungeon = false;
+        dungeonManager.exitDungeon();
 
         if (world == 1) {
-            mapBackground.loadMap("tiles/world1/map1.png");
-            collisionManager = new CollisionManager("maps/Detailed_Map1_Collision.tmx");
+            mapBackground.loadMap("tiles/world1/EnhanceMap1.png");
+            collisionManager = new CollisionManager("maps/EnhanceMap1_Collision.tmx");
 
-            player.x = 678;
-            player.y = 1450;
+             player.x = 100;
+            player.y = 670;
         }
 
         if (world == 2) {
-            mapBackground.loadMap("tiles/world2/map2.png");
-            collisionManager = new CollisionManager("maps/Detailed_Map2_Collision.tmx");
+            mapBackground.loadMap("tiles/world2/World 2.png");
+            collisionManager = new CollisionManager("maps/World 2.tmx");
             playMusic(WORLD_2_MUSIC);
 
-            player.x = 800;
-            player.y = 982;
+            player.x = 100;
+            player.y = 670;
         }
 
         if (world == 3) {
-            mapBackground.loadMap("tiles/world3/map3.png");
-            collisionManager = new CollisionManager("maps/Detailed_Map3_Collision.tmx");
+            mapBackground.loadMap("tiles/world3/World 3.png");
+            collisionManager = new CollisionManager("maps/World 3.tmx");
             playMusic(WORLD_3_MUSIC);
 
-            player.x = 3024;
-            player.y = 1584;
+            player.x = 1456;
+            player.y = 500;
         }
 
         worldWidth = mapBackground.worldWidth;
@@ -611,6 +661,8 @@ public class GameScreen extends JPanel implements Runnable {
             return;
         }
 
+        inDungeon = true;
+        bossSpawned = false;  // Reset boss spawn flag for new dungeon
         dungeonManager.enterDungeon(dungeonNumber);
 
         mapBackground.loadMap(dungeon.mapPath);
@@ -619,24 +671,77 @@ public class GameScreen extends JPanel implements Runnable {
         player.x = dungeon.enterX;
         player.y = dungeon.enterY;
 
+        keyH.upPressed = false;
+        keyH.downPressed = false;
+        keyH.leftPressed = false;
+        keyH.rightPressed = false;
+
+        spawnFreezeFrames = 2;
+        requestFocusInWindow();
+
         worldWidth = mapBackground.worldWidth;
         worldHeight = mapBackground.worldHeight;
         camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
 
         enemies.clear();
+        spawnEnemies();  // Spawn dungeon enemies
+        showDungeonIntroIfNeeded(currentWorld, dungeonNumber);
     }
 
-    private void switchToWorld() {
-        DungeonData dungeon = dungeonManager.getDungeon(
-                currentWorld,
-                dungeonManager.getCurrentDungeon()
-        );
+    private void showDungeonIntroIfNeeded(int world, int dungeonNumber) {
+        dungeonIntroQueue.clear();
+        dungeonIntroStyleQueue.clear();
 
-        dungeonManager.exitDungeon();
+        if (world == 1 && dungeonNumber == 3) {
+            queueDungeonIntro(dungeonIntroImages[0]);
+        } else if (world == 2 && dungeonNumber == 3) {
+            queueDungeonIntro(dungeonIntroImages[1]);
+        } else if (world == 3 && dungeonNumber == 3) {
+            queueDungeonIntro(dungeonIntroImages[3], true);
+            queueDungeonIntro(dungeonIntroImages[2]);
+        }
 
-        switchWorld(currentWorld);
+        advanceDungeonIntroPopup();
+    }
 
-        if (dungeon != null) {
+    private void queueDungeonIntro(Image image) {
+        queueDungeonIntro(image, false);
+    }
+
+    private void queueDungeonIntro(Image image, boolean usePuzzleStyle) {
+        if (image != null) {
+            dungeonIntroQueue.add(image);
+            dungeonIntroStyleQueue.add(usePuzzleStyle);
+        }
+    }
+
+    private void advanceDungeonIntroPopup() {
+        if (dungeonIntroQueue.isEmpty()) {
+            dungeonIntroPopupOpen = false;
+            dungeonIntroPopupImage = null;
+            dungeonIntroPopupUsesPuzzleStyle = false;
+        } else {
+            dungeonIntroPopupImage = dungeonIntroQueue.remove(0);
+            dungeonIntroPopupUsesPuzzleStyle = !dungeonIntroStyleQueue.isEmpty() && dungeonIntroStyleQueue.remove(0);
+            dungeonIntroPopupOpen = true;
+        }
+        repaint();
+    }
+
+        private void switchToWorld() {
+            DungeonData dungeon = dungeonManager.getDungeon(
+                    currentWorld,
+                    dungeonManager.getCurrentDungeon()
+            );
+
+            dungeonManager.exitDungeon();
+
+            switchWorld(currentWorld);
+
+            keyH.upPressed = false;
+            keyH.downPressed = false;
+            keyH.leftPressed = false;
+            keyH.rightPressed = false;
 
             player.x = dungeon.returnX;
             player.y = dungeon.returnY;
@@ -644,12 +749,12 @@ public class GameScreen extends JPanel implements Runnable {
             Rectangle playerBox = new Rectangle(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
 
             Rectangle exitArea = dungeonManager.getExitRect(currentWorld, dungeonManager.getCurrentDungeon());
+
             if (exitArea != null && playerBox.intersects(exitArea)) {
                 player.x = exitArea.x;
                 player.y = exitArea.y;
             }
         }
-    }
 
     public void setSelectedCharacter(String name) {
         this.selectedCharacter = name;
@@ -762,9 +867,14 @@ public class GameScreen extends JPanel implements Runnable {
     private void spawnEnemies() {
         enemies.clear();
 
-        // No monsters at level 3, 6, or 9
+        // If in a dungeon, spawn dungeon-specific enemies
+        if (inDungeon) {
+            spawnDungeonEnemies();
+            return;
+        }
+
+        // Boss levels are handled by D3 dungeons, so keep the world map clear.
         if (isMonsterClearLevel()) {
-            spawnSpecialLevelEnemy();
             return;
         }
 
@@ -813,6 +923,91 @@ public class GameScreen extends JPanel implements Runnable {
             Character enemyChar = EnemyFactory.createEnemyForLevel(playerCharacter.getLevel());
             enemies.add(new Enemy(ex, ey, enemyChar, this));
         }
+    }
+
+    /**
+     * Spawn dungeon-specific enemies based on dungeon configuration
+     */
+    private void spawnDungeonEnemies() {
+        int world = currentWorld;
+        int dungeonNum = dungeonManager.getCurrentDungeon();
+
+        // Try to spawn minions first
+        String minionsType = dungeonManager.getMinionsType(world, dungeonNum);
+        int minionsCount = dungeonManager.getMinionsCount(world, dungeonNum);
+
+        if (minionsType != null && minionsCount > 0) {
+            int[][] spawnPositions = dungeonManager.getMinionSpawnPositions(world, dungeonNum);
+            spawnDungeonMinions(minionsType, minionsCount, spawnPositions);
+        }
+
+        // If no minions, spawn boss instead
+        String bossType = dungeonManager.getBossType(world, dungeonNum);
+        if (bossType != null) {
+            if (world == 3 && dungeonNum == 3 && finalBossDefeated) return;
+            if (bossSpawned) return;
+
+            int[] bossPos = dungeonManager.getBossSpawnPos(world, dungeonNum);
+            spawnDungeonBoss(bossType, bossPos[0], bossPos[1]);
+            bossSpawned = true;
+        }
+    }
+
+    /**
+     * Spawn multiple minions at specified location
+     */
+    private void spawnDungeonMinions(String minionsType, int count, int[][] spawnPositions) {
+        for (int i = 0; i < count; i++) {
+            int spawnX = 500 + (i * 80);
+            int spawnY = 400;
+
+            if (spawnPositions != null && i < spawnPositions.length) {
+                spawnX = spawnPositions[i][0];
+                spawnY = spawnPositions[i][1];
+            }
+
+            Character minion = createMinion(minionsType);
+            if (minion != null) {
+                enemies.add(new Enemy(spawnX, spawnY, minion, this));
+            }
+        }
+    }
+
+    /**
+     * Spawn a boss at specified location
+     */
+    private void spawnDungeonBoss(String bossType, int spawnX, int spawnY) {
+        Character boss = createBoss(bossType);
+        if (boss != null) {
+            enemies.add(new Enemy(spawnX, spawnY, boss, this));
+        }
+    }
+
+    /**
+     * Create a minion character based on type
+     */
+    private Character createMinion(String minionsType) {
+        return switch(minionsType) {
+            case "ShadowSprite" -> new ShadowLogic(1);
+            case "ShadowSpriteLv2" -> new ShadowLogic(2);
+            case "ArmoredGhostSprite" -> new ArmoredGhostLogic(4);
+            case "ArmoredGhostSpriteLv2" -> new ArmoredGhostLogic(5);
+            case "CultistSprite" -> new CultistLogic(7);
+            case "CultistSpriteLv2" -> new CultistLogic(8);
+            default -> null;
+        };
+    }
+
+    /**
+     * Create a boss character based on type
+     */
+    private Character createBoss(String bossType) {
+        return switch(bossType) {
+            case "Noctyx" -> new NoctyxLogic();
+            case "Bloodmancer" -> new BloodmancerLogic();
+            case "Khai" -> new FinalBossLogic(); // This is the final boss
+            default -> null;
+        };
     }
 
     private void spawnBoss(Character boss, int offsetX, int offsetY) {
@@ -896,6 +1091,22 @@ public class GameScreen extends JPanel implements Runnable {
             if (isBoss(defeated.character)) {
                 enemies.remove(defeated);
 
+                // Award puzzle piece if in dungeon with puzzle piece boss
+                if (inDungeon) {
+                    int world = currentWorld;
+                    int dungeonNum = dungeonManager.getCurrentDungeon();
+                    if (dungeonManager.doesBossGivePuzzlePiece(world, dungeonNum)) {
+                        awardPuzzlePiece(world, dungeonNum);
+                    }
+                }
+
+                if (defeated.character instanceof FinalBossLogic &&
+                        inDungeon && currentWorld == 3 && dungeonManager.getCurrentDungeon() == 3) {
+                    finalBossDefeated = true;
+                    enemies.clear();
+                    bossSpawned = true;
+                }
+
                 if (defeated.character instanceof FinalBossLogic && !storyTriggered[10]) {
                     enemies.clear();
                     bossSpawned = true;
@@ -908,6 +1119,17 @@ public class GameScreen extends JPanel implements Runnable {
             } else {
                 defeated.defeated = true;
                 defeated.respawnTimer = 300;
+
+                // Check if all minions are defeated in W2_D2 or W3_D2 for puzzle piece
+                if (inDungeon) {
+                    int world = currentWorld;
+                    int dungeonNum = dungeonManager.getCurrentDungeon();
+                    if ((world == 2 && dungeonNum == 2) || (world == 3 && dungeonNum == 2)) {
+                        if (areAllMinionsDefeated()) {
+                            awardPuzzlePiece(world, dungeonNum);
+                        }
+                    }
+                }
             }
         } else {
             pushPlayerAwayFromEnemy(defeated);
@@ -932,6 +1154,63 @@ public class GameScreen extends JPanel implements Runnable {
                 gameThread.start();
             }
         });
+    }
+
+    /**
+     * Check if all minions in the current dungeon have been defeated
+     */
+    private boolean areAllMinionsDefeated() {
+        for (Enemy enemy : enemies) {
+            // Skip bosses, only check minions
+            if (!isBoss(enemy.character)) {
+                // If any minion is not defeated, return false
+                if (!enemy.defeated) {
+                    return false;
+                }
+            }
+        }
+        // All non-boss enemies are defeated
+        return true;
+    }
+
+    /**
+     * Award a puzzle piece to the player for defeating a dungeon boss or all minions
+     */
+    private void awardPuzzlePiece(int world, int dungeonNum) {
+        // Map specific bosses to their puzzle piece indices (0-3 for 4 pieces)
+        int pieceIndex = -1;
+
+        // Determine which piece this boss gives
+        if (world == 1 && dungeonNum == 3) {
+            pieceIndex = 0;  // 1st piece from W1_D3 Noctyx
+        } else if (world == 2 && dungeonNum == 2) {
+            pieceIndex = 1;  // 2nd piece from W2_D2 ArmoredGhostLv2
+        } else if (world == 2 && dungeonNum == 3) {
+            pieceIndex = 2;  // 3rd piece from W2_D3 Bloodmancer
+        } else if (world == 3 && dungeonNum == 2) {
+            pieceIndex = 3;  // 4th piece from W3_D2 CultistLv2
+        }
+
+        if (pieceIndex >= 0 && pieceIndex < 4 && !puzzlePieceCollected[pieceIndex]) {
+            puzzlePieceCollected[pieceIndex] = true;
+            puzzlePieceCount++;
+            showPuzzlePiecePopup(pieceIndex);
+            System.out.println("Puzzle piece acquired! " + puzzlePieceCount + " out of 4");
+        }
+    }
+
+    private void showPuzzlePiecePopup(int pieceIndex) {
+        puzzlePiecePopupImage = puzzlePieceImages[pieceIndex];
+        puzzlePiecePopupText = puzzlePieceCount + "/4 acquired";
+        puzzlePiecePopupOpen = true;
+        repaint();
+    }
+
+    /**
+     * Get the current puzzle piece count
+     */
+    public int getPuzzlePieceCount() {
+        return puzzlePieceCount;
     }
 
     @Override
@@ -989,7 +1268,20 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     private void update() {
+                if (spawnFreezeFrames > 0) {
+            spawnFreezeFrames--;
+
+            keyH.upPressed = false;
+            keyH.downPressed = false;
+            keyH.leftPressed = false;
+            keyH.rightPressed = false;
+
+            camera.update(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
+            return;
+        }
         if (creditsOpen) return;
+        if (puzzlePiecePopupOpen) return;
+        if (dungeonIntroPopupOpen) return;
 
         if (inBattle) return;
 
@@ -1051,7 +1343,7 @@ public class GameScreen extends JPanel implements Runnable {
                 if (storyOpen) {
                     showKhaiAfterStory = true;
                 } else {
-                    khaiDialogueOpen = true;
+                    showKhaiDialogue("");
                 }
 
                 khaiDialogueTriggered[lvl] = true;
@@ -1072,11 +1364,28 @@ public class GameScreen extends JPanel implements Runnable {
         if (!dungeonManager.isInDungeon()) {
             int dungeonToEnter = dungeonManager.checkDungeonEntry(currentWorld, playerBox);
 
-
             if (dungeonToEnter != 0) {
-                switchToDungeon(dungeonToEnter);
-                return;
+                // Check if player has sufficient level
+                int playerLevel = playerCharacter != null ? playerCharacter.getLevel() : 1;
+                if (dungeonManager.canEnterDungeon(currentWorld, dungeonToEnter, playerLevel)) {
+                    blockedDungeonWarning = 0;
+                    switchToDungeon(dungeonToEnter);
+                    return;
+                } else {
+                    if (blockedDungeonWarning != dungeonToEnter) {
+                        showKhaiDialogue(
+                                "Level is too low for this dungeon.\n\n" +
+                                "You are not strong enough to enter this place yet.\n\n" +
+                                "Return when your level is higher."
+                        );
+                        blockedDungeonWarning = dungeonToEnter;
+                    }
+                }
+            } else {
+                blockedDungeonWarning = 0;
             }
+        } else {
+            blockedDungeonWarning = 0;
         }
 
         if (dungeonManager.isInDungeon()) {
@@ -1095,6 +1404,9 @@ public class GameScreen extends JPanel implements Runnable {
 
             // ===== RESPAWN LOGIC =====
             if (enemy.defeated) {
+                if (inDungeon) {
+                    continue;
+                }
 
                 enemy.respawnTimer--;
 
@@ -1261,7 +1573,62 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     public boolean isDialogueOpen() {
-        return storyOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
+        return storyOpen || puzzlePiecePopupOpen || dungeonIntroPopupOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
+    }
+
+        public void toggleCollisionDebug() {
+            showCollisionDebug = !showCollisionDebug;
+            repaint();
+        }
+
+    private void drawCollisionDebug(Graphics2D g2) {
+        if (!showCollisionDebug || collisionManager == null) {
+            return;
+        }
+
+        boolean[][] blocked = collisionManager.getBlockedTiles();
+        int tileSize = collisionManager.getTileSize();
+        int mapCols = collisionManager.getMapCols();
+        int mapRows = collisionManager.getMapRows();
+
+        g2.setColor(new Color(255, 0, 0, 100)); // Red with transparency
+        g2.setStroke(new BasicStroke(1));
+
+        for (int col = 0; col < mapCols; col++) {
+            for (int row = 0; row < mapRows; row++) {
+                if (blocked[col][row]) {
+                    int worldX = col * tileSize;
+                    int worldY = row * tileSize;
+
+                    int screenX = worldX - camera.offsetX();
+                    int screenY = worldY - camera.offsetY();
+
+                    // Only draw if visible on screen
+                    if (!(screenX + tileSize > 0 && screenX < getWidth() &&
+                        screenY + tileSize > 0 && screenY < getHeight())) {
+                        continue;
+                    }
+
+                    // Try to get specific collision shapes for this tile
+                    java.util.List<java.awt.Shape> shapes = collisionManager.getCollisionShapesAtTile(col, row);
+
+                    if (shapes != null && !shapes.isEmpty()) {
+                        // Draw the actual collision shapes
+                        for (java.awt.Shape shape : shapes) {
+                            // Translate shape to screen coordinates
+                            java.awt.geom.AffineTransform at = new java.awt.geom.AffineTransform();
+                            at.translate(screenX, screenY);
+                            java.awt.Shape transformedShape = at.createTransformedShape(shape);
+                            g2.draw(transformedShape);
+                            g2.fill(transformedShape);
+                        }
+                    } else {
+                        // Fallback: draw full tile rectangle if no custom shapes
+                        g2.fillRect(screenX, screenY, tileSize, tileSize);
+                    }
+                }
+            }
+        }
     }
 
     @Override
@@ -1285,6 +1652,8 @@ public class GameScreen extends JPanel implements Runnable {
             player.draw(g2, camera);
         }
 
+        drawCollisionDebug(g2);
+
         drawHUD(g2);
 
         if (shopDialogueOpen) {
@@ -1306,6 +1675,14 @@ public class GameScreen extends JPanel implements Runnable {
 
         if (infoOpen) {
             drawInfoWindow(g2);
+        }
+
+        if (puzzlePiecePopupOpen) {
+            drawPuzzlePiecePopup(g2);
+        }
+
+        if (dungeonIntroPopupOpen) {
+            drawDungeonIntroPopup(g2);
         }
 
         if (storyOpen) {
@@ -1349,6 +1726,139 @@ public class GameScreen extends JPanel implements Runnable {
 
         g2.setFont(new Font("Serif", Font.ITALIC, 12));
         g2.drawString("Click to continue", x + w - 140, y + h - 12);
+    }
+
+    private void drawPuzzlePiecePopup(Graphics2D g2) {
+        drawPuzzleImagePopup(g2, puzzlePiecePopupImage, puzzlePiecePopupText);
+    }
+
+    private void drawPuzzleImagePopup(Graphics2D g2, Image image, String title) {
+        int W = getWidth();
+        int H = getHeight();
+
+        g2.setColor(new Color(0, 0, 0, 135));
+        g2.fillRect(0, 0, W, H);
+
+        int centerX = W / 2;
+        int centerY = H / 2 + 8;
+        int glowRadius = Math.min(220, Math.max(140, W / 6));
+
+        RadialGradientPaint glow = new RadialGradientPaint(
+                new Point(centerX, centerY),
+                glowRadius,
+                new float[]{0f, 0.55f, 1f},
+                new Color[]{
+                        new Color(255, 225, 120, 185),
+                        new Color(220, 185, 90, 75),
+                        new Color(255, 220, 120, 0)
+                }
+        );
+        Paint oldPaint = g2.getPaint();
+        g2.setPaint(glow);
+        g2.fillOval(centerX - glowRadius, centerY - glowRadius, glowRadius * 2, glowRadius * 2);
+        g2.setPaint(oldPaint);
+
+        int circleSize = Math.min(320, Math.max(220, W / 4));
+        int circleX = centerX - circleSize / 2;
+        int circleY = centerY - circleSize / 2;
+
+        g2.setColor(new Color(215, 190, 120, 95));
+        g2.setStroke(new BasicStroke(3f));
+        g2.drawOval(circleX, circleY, circleSize, circleSize);
+        g2.setColor(new Color(225, 210, 150, 45));
+        g2.setStroke(new BasicStroke(1.4f));
+        g2.drawOval(circleX + 18, circleY + 18, circleSize - 36, circleSize - 36);
+        g2.drawLine(centerX, circleY + 28, circleX + circleSize - 38, circleY + circleSize - 48);
+        g2.drawLine(circleX + 38, circleY + circleSize - 48, circleX + circleSize - 38, circleY + circleSize - 48);
+        g2.drawLine(centerX, circleY + 28, circleX + 38, circleY + circleSize - 48);
+
+        int imgW = 190;
+        int imgH = 150;
+        if (image != null) {
+            int naturalW = image.getWidth(null);
+            int naturalH = image.getHeight(null);
+            if (naturalW > 0 && naturalH > 0) {
+                double ratio = Math.min(220.0 / naturalW, 170.0 / naturalH);
+                imgW = Math.max(1, (int)Math.round(naturalW * ratio));
+                imgH = Math.max(1, (int)Math.round(naturalH * ratio));
+            }
+        }
+
+        int imgX = centerX - imgW / 2;
+        int imgY = centerY - imgH / 2 + 8;
+
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        if (image != null) {
+            g2.drawImage(image, imgX, imgY, imgW, imgH, null);
+        }
+
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setFont(new Font("Serif", Font.PLAIN, 40));
+        FontMetrics titleFm = g2.getFontMetrics();
+        int titleX = centerX - titleFm.stringWidth(title) / 2;
+        int titleY = Math.max(90, imgY - 34);
+        g2.setColor(new Color(0, 0, 0, 155));
+        g2.drawString(title, titleX + 2, titleY + 2);
+        g2.setColor(Color.WHITE);
+        g2.drawString(title, titleX, titleY);
+
+        String prompt = "Click to continue";
+        g2.setFont(new Font("Serif", Font.ITALIC, 14));
+        FontMetrics promptFm = g2.getFontMetrics();
+        g2.setColor(new Color(235, 230, 245, 190));
+        g2.drawString(prompt, centerX - promptFm.stringWidth(prompt) / 2,
+                Math.min(H - 34, centerY + circleSize / 2 + 42));
+    }
+
+    private void drawDungeonIntroPopup(Graphics2D g2) {
+        if (dungeonIntroPopupUsesPuzzleStyle) {
+            drawPuzzleImagePopup(g2, dungeonIntroPopupImage, "Puzzle complete");
+            return;
+        }
+
+        int W = getWidth();
+        int H = getHeight();
+
+        g2.setColor(new Color(0, 0, 0, 165));
+        g2.fillRect(0, 0, W, H);
+
+        if (dungeonIntroPopupImage != null) {
+            int naturalW = dungeonIntroPopupImage.getWidth(null);
+            int naturalH = dungeonIntroPopupImage.getHeight(null);
+
+            if (naturalW > 0 && naturalH > 0) {
+                int maxW = (int)(W * 0.82);
+                int maxH = (int)(H * 0.72);
+                double scale = Math.min((double)maxW / naturalW, (double)maxH / naturalH);
+
+                int drawW = Math.max(1, (int)Math.round(naturalW * scale));
+                int drawH = Math.max(1, (int)Math.round(naturalH * scale));
+                int drawX = (W - drawW) / 2;
+                int drawY = (H - drawH) / 2 - 8;
+
+                g2.setColor(new Color(255, 230, 150, 80));
+                g2.setStroke(new BasicStroke(2f));
+                g2.drawRoundRect(drawX - 8, drawY - 8, drawW + 16, drawH + 16, 8, 8);
+
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g2.drawImage(dungeonIntroPopupImage, drawX, drawY, drawW, drawH, null);
+            }
+        }
+
+        String prompt = "Click to continue";
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setFont(new Font("Serif", Font.ITALIC, 15));
+        FontMetrics fm = g2.getFontMetrics();
+        int x = W / 2 - fm.stringWidth(prompt) / 2;
+        int y = H - 36;
+        g2.setColor(new Color(0, 0, 0, 170));
+        g2.drawString(prompt, x + 2, y + 2);
+        g2.setColor(new Color(245, 240, 255, 220));
+        g2.drawString(prompt, x, y);
     }
 
     private void drawEndingChoice(Graphics2D g2) {
@@ -1761,15 +2271,51 @@ public class GameScreen extends JPanel implements Runnable {
                 RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         g2.setFont(new Font("Serif", Font.PLAIN, 15));
         g2.setColor(new Color(215, 210, 235));
-        g2.drawString("So\u2026 you\u2019ve finally made it this far.",          textX, textStartY);
-        g2.drawString("You\u2019re stronger now\u2014strong enough to face what lies ahead.", textX, textStartY + lineGap);
-        g2.drawString("The Boss Dungeon is open to you.",                         textX, textStartY + lineGap * 2);
-        g2.drawString("\u2026Go on. Step inside.",                                textX, textStartY + lineGap * 3);
-        g2.drawString("I\u2019ll be waiting.",                                    textX, textStartY + lineGap * 4);
+
+        if (khaiDialogueMessage != null && !khaiDialogueMessage.isEmpty()) {
+            int textMaxW = imgX + imgW - textX - 48;
+            drawKhaiWrappedText(g2, khaiDialogueMessage, textX, textStartY, textMaxW);
+        } else {
+            g2.drawString("So\u2026 you\u2019ve finally made it this far.",          textX, textStartY);
+            g2.drawString("You\u2019re stronger now\u2014strong enough to face what lies ahead.", textX, textStartY + lineGap);
+            g2.drawString("The Boss Dungeon is open to you.",                         textX, textStartY + lineGap * 2);
+            g2.drawString("\u2026Go on. Step inside.",                                textX, textStartY + lineGap * 3);
+            g2.drawString("I\u2019ll be waiting.",                                    textX, textStartY + lineGap * 4);
+        }
 
         g2.setFont(new Font("Serif", Font.ITALIC, 13));
         g2.setColor(new Color(180, 170, 200, 200));
         g2.drawString("Click to continue", imgX + imgW - 148, boxBotY - 6);
+    }
+
+    private void drawKhaiWrappedText(Graphics2D g2, String text, int x, int y, int maxWidth) {
+        FontMetrics fm = g2.getFontMetrics();
+        int lineHeight = fm.getHeight() + 4;
+        int paragraphGap = lineHeight / 2;
+
+        for (String paragraph : text.split("\\n", -1)) {
+            if (paragraph.isEmpty()) {
+                y += paragraphGap;
+                continue;
+            }
+
+            String line = "";
+            for (String word : paragraph.split(" ")) {
+                String test = line + word + " ";
+                if (fm.stringWidth(test) > maxWidth && !line.isEmpty()) {
+                    g2.drawString(line.trim(), x, y);
+                    line = word + " ";
+                    y += lineHeight;
+                } else {
+                    line = test;
+                }
+            }
+
+            if (!line.isEmpty()) {
+                g2.drawString(line.trim(), x, y);
+                y += lineHeight;
+            }
+        }
     }
 
     private void drawWensWrappedText(Graphics2D g2, String text, int x, int y, int maxWidth) {
@@ -2283,6 +2829,7 @@ public class GameScreen extends JPanel implements Runnable {
             g2.setFont(new Font("Serif", Font.BOLD, 14));
             g2.setColor(GOLD_LIGHT);
             g2.drawString("LV " + playerCharacter.getLevel(), 16, baseY);
+            g2.drawString("Puzzle Pieces: " + puzzlePieceCount + " / 4", 16, baseY - 18);
 
             // HP
             drawHudBar(g2, 16, baseY + 10, 200, "HP",
