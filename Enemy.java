@@ -114,8 +114,8 @@ public class Enemy {
         int drawW = Math.max(W, (int)(character.getFrameWidth()  * scale));
         int drawH = Math.max(H, (int)(character.getFrameHeight() * scale));
 
-        int maxMapW = character.isFinalBoss() ? W * 6 : W * 2;
-        int maxMapH = character.isFinalBoss() ? W * 6 : H * 2;
+        int maxMapW = character.isFinalBoss() ? W * 6 : W + W / 2;
+        int maxMapH = character.isFinalBoss() ? W * 6 : H + H / 2;
         double capRatio = Math.min(
                 Math.min(1.0, (double)maxMapW / Math.max(1, drawW)),
                 Math.min(1.0, (double)maxMapH / Math.max(1, drawH))
