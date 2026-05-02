@@ -114,12 +114,16 @@ public class Enemy {
         int drawW = Math.max(W, (int)(character.getFrameWidth()  * scale));
         int drawH = Math.max(H, (int)(character.getFrameHeight() * scale));
 
-        // Cap boss sprites so they never dwarf the entire screen on the map.
-        int maxMapSize = character.isFinalBoss() ? W * 6 : W * 4;
-        if (drawW > maxMapSize) {
-            double ratio = (double) maxMapSize / drawW;
-            drawW = maxMapSize;
-            drawH = (int)(drawH * ratio);
+        int maxMapW = character.isFinalBoss() ? W * 6 : W * 2;
+        int maxMapH = character.isFinalBoss() ? W * 6 : H * 2;
+        double capRatio = Math.min(
+                Math.min(1.0, (double)maxMapW / Math.max(1, drawW)),
+                Math.min(1.0, (double)maxMapH / Math.max(1, drawH))
+        );
+
+        if (capRatio < 1.0) {
+            drawW = Math.max(W, (int)Math.round(drawW * capRatio));
+            drawH = Math.max(H, (int)Math.round(drawH * capRatio));
         }
 
         // Anchor bottom-center of the sprite to the enemy's world position
