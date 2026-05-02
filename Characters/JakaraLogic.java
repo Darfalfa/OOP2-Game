@@ -91,5 +91,82 @@ public class JakaraLogic extends Character {
         }
     }
 
+    @Override
+    public String getSkillSprite(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> "images/Jakara_EldritchBeam.png";
+            case 2 -> "images/Jakara_ArgentRupture.png";
+            case 3 -> "images/Jakara_AstralSupernova.png";
+            default -> null;
+        };
+    }
+
+    @Override
+    public int getSkillFrameWidth(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 961;
+            case 2 -> 1016;
+            case 3 -> 519;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillFrameHeight(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 643;
+            case 2 -> 647;
+            case 3 -> 479;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getSkillMaxFrames(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 20;
+            case 2 -> 19;
+            case 3 -> 25;
+            default -> 1;
+        };
+    }
+
+    @Override
+    public double getSkillRenderScale(int skillNumber) {
+        return switch (skillNumber) {
+            case 1 -> 4.0;
+            case 2 -> 4.0;
+            case 3 -> 3.0;
+            default -> 1.0;
+        };
+    }
+
+    @Override
+    public int getSkillVerticalOffset(int skillNumber) {
+        return switch (skillNumber) {
+            case 3 -> -210;
+            default -> 0;
+        };
+    }
+
+    @Override
+    public int getVerticalOffset() {
+        return 30;
+    }
+
+    @Override
+    public double getScale() {
+        return 0.66;
+    }
+
+    @Override
+    public double getWorldMapScale() {
+        return 1.20;
+    }
+
+    @Override
+    public int getWorldMapVerticalOffset() {
+        return 65;
+    }
 
 }

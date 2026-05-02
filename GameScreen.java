@@ -1414,41 +1414,38 @@ public class GameScreen extends JPanel implements Runnable {
         // Credits
         int leftColX = panelX + 65;
         int rightColX = panelX + 245;
-        int startY = 200;
+        int startY = (int)(screenH * 0.28);
 
         drawCreditSection(g2, "DESIGN", new String[]{
-                "Name Placeholder",
-                "Name Placeholder",
-                "Name Placeholder"
+                "Alianec, Maria Andrea A.",
+                "Cabanes, Nico Angello L."
         }, leftColX, startY);
 
         drawCreditSection(g2, "PROGRAMMING", new String[]{
-                "Name Placeholder",
-                "Name Placeholder",
-                "Name Placeholder"
+                "Abelada, Jackielou C.",
+                "Cabanes, Nico Angello L.",
+                "Ruiz, Ron Adrian C."
         }, rightColX, startY);
 
         drawCreditSection(g2, "ART", new String[]{
-                "Name Placeholder",
-                "Name Placeholder",
-                "Name Placeholder"
-        }, leftColX, startY + 150);
+                "Alianec, Maria Andrea A.",
+                "Cabanes, Nico Angello L."
+        }, leftColX, startY + 120);
 
         drawCreditSection(g2, "STORY", new String[]{
-                "Name Placeholder",
-                "Name Placeholder",
-                "Name Placeholder"
-        }, rightColX, startY + 150);
+                "Canillas, Wendel A."
+        }, rightColX, startY + 120);
 
         drawCreditSection(g2, "MUSIC", new String[]{
-                "Name Placeholder",
-                "Name Placeholder"
-        }, leftColX, startY + 300);
+                "Cabanes, Nico Angello L.",
+                "Canillas, Wendel A."
+        }, leftColX, startY + 240);
 
         drawCreditSection(g2, "QA", new String[]{
-                "Name Placeholder",
-                "Name Placeholder"
-        }, rightColX, startY + 300);
+                "Abelada, Jackielou C.",
+                "Canillas, Wendel A.",
+                "Ruiz, Ron Adrian C."
+        }, rightColX, startY + 240);
 
         // Continue button
         creditsContinueBtn = new Rectangle(panelX + 115, screenH - 90, 210, 45);
