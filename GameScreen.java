@@ -74,6 +74,10 @@ public class GameScreen extends JPanel implements Runnable {
     private int lastPlayerLevel = -1;
     private boolean bossSpawned = false;
 
+    // Puzzle pieces
+    private int puzzlePieceCount = 0;
+    private boolean[] puzzlePieceCollected = new boolean[4]; // 4 puzzle pieces total
+
     private Character playerCharacter;
 
     private String selectedCharacter;
@@ -163,12 +167,12 @@ public class GameScreen extends JPanel implements Runnable {
         addKeyListener(keyH);
 
         mapBackground = new MapBackground();
-        mapBackground.loadMap("tiles/world1/map1.png");
+        mapBackground.loadMap("tiles/world1/EnhanceMap1.png");
 
         worldWidth = mapBackground.worldWidth;
         worldHeight = mapBackground.worldHeight;
 
-        collisionManager = new CollisionManager("maps/Detailed_Map1_Collision.tmx");
+        collisionManager = new CollisionManager("maps/EnhanceMap1_Collision.tmx");
 
         dungeonManager = new DungeonManager();
 
@@ -451,11 +455,11 @@ public class GameScreen extends JPanel implements Runnable {
         inDungeon = false;
 
         if (world == 1) {
-            mapBackground.loadMap("tiles/world1/map1.png");
-            collisionManager = new CollisionManager("maps/Detailed_Map1_Collision.tmx");
+            mapBackground.loadMap("tiles/world1/EnhanceMap1.png");
+            collisionManager = new CollisionManager("maps/EnhanceMap1_Collision.tmx");
 
-            player.x = 678;
-            player.y = 1450;
+             player.x = 100;
+            player.y = 670;
         }
 
         if (world == 2) {
@@ -498,6 +502,8 @@ public class GameScreen extends JPanel implements Runnable {
             return;
         }
 
+        inDungeon = true;
+        bossSpawned = false;  // Reset boss spawn flag for new dungeon
         dungeonManager.enterDungeon(dungeonNumber);
 
         mapBackground.loadMap(dungeon.mapPath);
@@ -519,6 +525,7 @@ public class GameScreen extends JPanel implements Runnable {
         camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
 
         enemies.clear();
+        spawnEnemies();  // Spawn dungeon enemies
     }
 
         private void switchToWorld() {
@@ -618,9 +625,14 @@ public class GameScreen extends JPanel implements Runnable {
     private void spawnEnemies() {
         enemies.clear();
 
-        // No monsters at level 3, 6, or 9
+        // If in a dungeon, spawn dungeon-specific enemies
+        if (inDungeon) {
+            spawnDungeonEnemies();
+            return;
+        }
+
+        // Boss levels are handled by D3 dungeons, so keep the world map clear.
         if (isMonsterClearLevel()) {
-            spawnSpecialLevelEnemy();
             return;
         }
 
@@ -671,6 +683,90 @@ public class GameScreen extends JPanel implements Runnable {
         }
     }
 
+    /**
+     * Spawn dungeon-specific enemies based on dungeon configuration
+     */
+    private void spawnDungeonEnemies() {
+        int world = currentWorld;
+        int dungeonNum = dungeonManager.getCurrentDungeon();
+
+        // Try to spawn minions first
+        String minionsType = dungeonManager.getMinionsType(world, dungeonNum);
+        int minionsCount = dungeonManager.getMinionsCount(world, dungeonNum);
+
+        if (minionsType != null && minionsCount > 0) {
+            int[][] spawnPositions = dungeonManager.getMinionSpawnPositions(world, dungeonNum);
+            spawnDungeonMinions(minionsType, minionsCount, spawnPositions);
+        }
+
+        // If no minions, spawn boss instead
+        String bossType = dungeonManager.getBossType(world, dungeonNum);
+        if (bossType != null) {
+            if (bossSpawned) return;
+            
+            int[] bossPos = dungeonManager.getBossSpawnPos(world, dungeonNum);
+            spawnDungeonBoss(bossType, bossPos[0], bossPos[1]);
+            bossSpawned = true;
+        }
+    }
+
+    /**
+     * Spawn multiple minions at specified location
+     */
+    private void spawnDungeonMinions(String minionsType, int count, int[][] spawnPositions) {
+        for (int i = 0; i < count; i++) {
+            int spawnX = 500 + (i * 80);
+            int spawnY = 400;
+
+            if (spawnPositions != null && i < spawnPositions.length) {
+                spawnX = spawnPositions[i][0];
+                spawnY = spawnPositions[i][1];
+            }
+
+            Character minion = createMinion(minionsType);
+            if (minion != null) {
+                enemies.add(new Enemy(spawnX, spawnY, minion, this));
+            }
+        }
+    }
+
+    /**
+     * Spawn a boss at specified location
+     */
+    private void spawnDungeonBoss(String bossType, int spawnX, int spawnY) {
+        Character boss = createBoss(bossType);
+        if (boss != null) {
+            enemies.add(new Enemy(spawnX, spawnY, boss, this));
+        }
+    }
+
+    /**
+     * Create a minion character based on type
+     */
+    private Character createMinion(String minionsType) {
+        return switch(minionsType) {
+            case "ShadowSprite" -> new ShadowLogic(1);
+            case "ShadowSpriteLv2" -> new ShadowLogic(2);
+            case "ArmoredGhostSprite" -> new ArmoredGhostLogic(4);
+            case "ArmoredGhostSpriteLv2" -> new ArmoredGhostLogic(5);
+            case "CultistSprite" -> new CultistLogic(7);
+            case "CultistSpriteLv2" -> new CultistLogic(8);
+            default -> null;
+        };
+    }
+
+    /**
+     * Create a boss character based on type
+     */
+    private Character createBoss(String bossType) {
+        return switch(bossType) {
+            case "Noctyx" -> new NoctyxLogic();
+            case "Bloodmancer" -> new BloodmancerLogic();
+            case "Khai" -> new FinalBossLogic(); // This is the final boss
+            default -> null;
+        };
+    }
+
     private void spawnBoss(Character boss, int offsetX, int offsetY) {
         int x = worldWidth / 2 + offsetX;
         int y = worldHeight / 2 + offsetY;
@@ -716,6 +812,15 @@ public class GameScreen extends JPanel implements Runnable {
             if (isBoss(defeated.character)) {
                 enemies.remove(defeated);
 
+                // Award puzzle piece if in dungeon with puzzle piece boss
+                if (inDungeon) {
+                    int world = currentWorld;
+                    int dungeonNum = dungeonManager.getCurrentDungeon();
+                    if (dungeonManager.doesBossGivePuzzlePiece(world, dungeonNum)) {
+                        awardPuzzlePiece(world, dungeonNum);
+                    }
+                }
+
                 if (defeated.character instanceof FinalBossLogic && !storyTriggered[10]) {
                     enemies.clear();
                     bossSpawned = true;
@@ -727,6 +832,17 @@ public class GameScreen extends JPanel implements Runnable {
             } else {
                 defeated.defeated = true;
                 defeated.respawnTimer = 300;
+
+                // Check if all minions are defeated in W2_D2 or W3_D2 for puzzle piece
+                if (inDungeon) {
+                    int world = currentWorld;
+                    int dungeonNum = dungeonManager.getCurrentDungeon();
+                    if ((world == 2 && dungeonNum == 2) || (world == 3 && dungeonNum == 2)) {
+                        if (areAllMinionsDefeated()) {
+                            awardPuzzlePiece(world, dungeonNum);
+                        }
+                    }
+                }
             }
         } else {
             pushPlayerAwayFromEnemy(defeated);
@@ -747,6 +863,55 @@ public class GameScreen extends JPanel implements Runnable {
                 gameThread.start();
             }
         });
+    }
+
+    /**
+     * Check if all minions in the current dungeon have been defeated
+     */
+    private boolean areAllMinionsDefeated() {
+        for (Enemy enemy : enemies) {
+            // Skip bosses, only check minions
+            if (!isBoss(enemy.character)) {
+                // If any minion is not defeated, return false
+                if (!enemy.defeated) {
+                    return false;
+                }
+            }
+        }
+        // All non-boss enemies are defeated
+        return true;
+    }
+
+    /**
+     * Award a puzzle piece to the player for defeating a dungeon boss or all minions
+     */
+    private void awardPuzzlePiece(int world, int dungeonNum) {
+        // Map specific bosses to their puzzle piece indices (0-3 for 4 pieces)
+        int pieceIndex = -1;
+
+        // Determine which piece this boss gives
+        if (world == 1 && dungeonNum == 3) {
+            pieceIndex = 0;  // 1st piece from W1_D3 Noctyx
+        } else if (world == 2 && dungeonNum == 2) {
+            pieceIndex = 1;  // 2nd piece from W2_D2 ArmoredGhostLv2
+        } else if (world == 2 && dungeonNum == 3) {
+            pieceIndex = 2;  // 3rd piece from W2_D3 Bloodmancer
+        } else if (world == 3 && dungeonNum == 2) {
+            pieceIndex = 3;  // 4th piece from W3_D2 CultistLv2
+        }
+
+        if (pieceIndex >= 0 && pieceIndex < 4 && !puzzlePieceCollected[pieceIndex]) {
+            puzzlePieceCollected[pieceIndex] = true;
+            puzzlePieceCount++;
+            System.out.println("Puzzle piece acquired! " + puzzlePieceCount + " out of 4");
+        }
+    }
+
+    /**
+     * Get the current puzzle piece count
+     */
+    public int getPuzzlePieceCount() {
+        return puzzlePieceCount;
     }
 
     @Override
@@ -892,10 +1057,16 @@ public class GameScreen extends JPanel implements Runnable {
         if (!dungeonManager.isInDungeon()) {
             int dungeonToEnter = dungeonManager.checkDungeonEntry(currentWorld, playerBox);
 
-
             if (dungeonToEnter != 0) {
-                switchToDungeon(dungeonToEnter);
-                return;
+                // Check if player has sufficient level
+                int playerLevel = playerCharacter != null ? playerCharacter.getLevel() : 1;
+                if (dungeonManager.canEnterDungeon(currentWorld, dungeonToEnter, playerLevel)) {
+                    switchToDungeon(dungeonToEnter);
+                    return;
+                } else {
+                    // Optional: show message that level is too low
+                    System.out.println("Level too low for this dungeon!");
+                }
             }
         }
 
@@ -915,6 +1086,9 @@ public class GameScreen extends JPanel implements Runnable {
 
             // ===== RESPAWN LOGIC =====
             if (enemy.defeated) {
+                if (inDungeon) {
+                    continue;
+                }
 
                 enemy.respawnTimer--;
 
@@ -2153,6 +2327,7 @@ public class GameScreen extends JPanel implements Runnable {
             g2.setFont(new Font("Serif", Font.BOLD, 14));
             g2.setColor(GOLD_LIGHT);
             g2.drawString("LV " + playerCharacter.getLevel(), 16, baseY);
+            g2.drawString("Puzzle Pieces: " + puzzlePieceCount + " / 4", 16, baseY - 18);
 
             // HP
             drawHudBar(g2, 16, baseY + 10, 200, "HP",
