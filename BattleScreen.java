@@ -1,6 +1,5 @@
 import Characters.*;
 import Characters.Character;
-
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
@@ -114,11 +113,19 @@ public class BattleScreen extends JPanel {
     private int frozenEnemyY = 0;
     private int frozenEnemyW = 0;
     private int frozenEnemyH = 0;
+    private int frozenEnemyVisibleX = 0;
+    private int frozenEnemyVisibleY = 0;
+    private int frozenEnemyVisibleW = 0;
+    private int frozenEnemyVisibleH = 0;
 
     private int frozenPlayerX = 0;
     private int frozenPlayerY = 0;
     private int frozenPlayerW = 0;
     private int frozenPlayerH = 0;
+    private int frozenPlayerVisibleX = 0;
+    private int frozenPlayerVisibleY = 0;
+    private int frozenPlayerVisibleW = 0;
+    private int frozenPlayerVisibleH = 0;
 
     // Per-character battle sprites (loaded once, swapped on character change)
     private BufferedImage ayaBattleSprite;
@@ -337,6 +344,14 @@ public class BattleScreen extends JPanel {
         this.frozenEnemyY = 0;
         this.frozenEnemyW = 0;
         this.frozenEnemyH = 0;
+        this.frozenEnemyVisibleX = 0;
+        this.frozenEnemyVisibleY = 0;
+        this.frozenEnemyVisibleW = 0;
+        this.frozenEnemyVisibleH = 0;
+        this.frozenPlayerVisibleX = 0;
+        this.frozenPlayerVisibleY = 0;
+        this.frozenPlayerVisibleW = 0;
+        this.frozenPlayerVisibleH = 0;
 
         this.playerCharacter = player;
         this.enemyCharacter = enemy;
@@ -886,6 +901,27 @@ public class BattleScreen extends JPanel {
             frozenEnemyY = (int)(groundY - eH + enemyCharacter.getVerticalOffset()); // no bounce
             frozenEnemyW = eW;
             frozenEnemyH = eH;
+
+            if (enemySpriteSheet != null && frameWidth > 0 && frameHeight > 0) {
+                int sx = enemyFrame * frameWidth;
+                Rectangle visibleSource = findVisibleBounds(enemySpriteSheet, sx, 0, frameWidth, frameHeight);
+                Rectangle visibleDest = mapSourceBoundsToDest(
+                        visibleSource,
+                        sx, 0,
+                        frameWidth, frameHeight,
+                        frozenEnemyX, frozenEnemyY,
+                        frozenEnemyW, frozenEnemyH
+                );
+                frozenEnemyVisibleX = visibleDest.x;
+                frozenEnemyVisibleY = visibleDest.y;
+                frozenEnemyVisibleW = visibleDest.width;
+                frozenEnemyVisibleH = visibleDest.height;
+            } else {
+                frozenEnemyVisibleX = frozenEnemyX;
+                frozenEnemyVisibleY = frozenEnemyY;
+                frozenEnemyVisibleW = frozenEnemyW;
+                frozenEnemyVisibleH = frozenEnemyH;
+            }
         }
 
         // Scale the ground shadow to match the enemy footprint
@@ -957,7 +993,9 @@ public class BattleScreen extends JPanel {
         int px = centerX - pW / 2;
         int py = groundY - pH - 5;
 
-        if (!(skillAnimTicks > 0 && !skillByEnemy)) {
+        boolean playerUsingSkill = skillAnimTicks > 0 && !skillByEnemy;
+
+        if (!playerUsingSkill) {
             frozenPlayerX = px;
             frozenPlayerY = py;
             frozenPlayerW = pW;
@@ -968,8 +1006,29 @@ public class BattleScreen extends JPanel {
 
         BufferedImage sprite = currentPlayerSprite();
 
+        if (!playerUsingSkill && sprite != null) {
+            BufferedImage cleaned = stripWhiteBackground(sprite);
+            Rectangle visibleSource = findVisibleBounds(cleaned, 0, 0, cleaned.getWidth(), cleaned.getHeight());
+            Rectangle visibleDest = mapSourceBoundsToDest(
+                    visibleSource,
+                    0, 0,
+                    cleaned.getWidth(), cleaned.getHeight(),
+                    px, py,
+                    pW, pH
+            );
+            frozenPlayerVisibleX = visibleDest.x;
+            frozenPlayerVisibleY = visibleDest.y;
+            frozenPlayerVisibleW = visibleDest.width;
+            frozenPlayerVisibleH = visibleDest.height;
+        } else if (!playerUsingSkill) {
+            frozenPlayerVisibleX = frozenPlayerX;
+            frozenPlayerVisibleY = frozenPlayerY;
+            frozenPlayerVisibleW = frozenPlayerW;
+            frozenPlayerVisibleH = frozenPlayerH;
+        }
+
         // ── Per-character ambient effects drawn BEHIND the sprite ─────────────
-        if (isJakara) {
+        if (!playerUsingSkill && isJakara) {
             // Pulsing arcane aura — violet glow
             float pulse = 0.4f + 0.3f * (float)Math.sin(animTick * 0.07);
             int auraAlpha = (int)(pulse * 100);
@@ -980,14 +1039,14 @@ public class BattleScreen extends JPanel {
             g2.setColor(new Color(200, 130, 255, auraAlpha));
             g2.fillOval(px + offX - 8, py - 4, pW + 16, pH + 8);
 
-        } else if (isRonnix) {
+        } else if (!playerUsingSkill && isRonnix) {
             // Smoldering ember glow — dark red/orange
             float pulse = 0.3f + 0.2f * (float)Math.sin(animTick * 0.05);
             int auraAlpha = (int)(pulse * 80);
             g2.setColor(new Color(200, 60, 20, auraAlpha));
             g2.fillOval(px + offX - 10, py + pH / 3, pW + 20, pH * 2 / 3 + 10);
 
-        } else {
+        } else if (!playerUsingSkill) {
             // Aya — soft wind shimmer in teal/white
             float pulse = 0.3f + 0.2f * (float)Math.sin(animTick * 0.06);
             int auraAlpha = (int)(pulse * 60);
@@ -996,11 +1055,11 @@ public class BattleScreen extends JPanel {
         }
 
         // ── Draw the actual battle sprite ─────────────────────────────────────
-        if (sprite != null) {
+        if (sprite != null && !playerUsingSkill) {
             // Strip near-white background if the source image has one
             BufferedImage cleaned = stripWhiteBackground(sprite);
             g2.drawImage(cleaned, px + offX, py, pW, pH, null);
-        } else {
+        } else if (!playerUsingSkill) {
             // Fallback drawn silhouette when the sprite file is missing
             Color silColor  = isRonnix ? new Color(140, 40, 40, 200)
                     : isJakara ? new Color(80, 30, 160, 200)
@@ -1084,9 +1143,15 @@ public class BattleScreen extends JPanel {
         int r = (argb >> 16) & 0xFF;
         int g = (argb >>  8) & 0xFF;
         int b =  argb        & 0xFF;
-        // Match white, near-white, and light lavender/grey pixel-art backgrounds
-        if (a == 0 || (r > 195 && g > 195 && b > 195))
+        // Match white, near-white, and the purple/lavender battle-sprite matte.
+        if (a == 0 || isBattleSpriteBackground(r, g, b))
             q.add(new int[]{x, y});
+    }
+
+    private boolean isBattleSpriteBackground(int r, int g, int b) {
+        boolean nearWhite = r > 195 && g > 195 && b > 195;
+        boolean lavenderEdge = b > 170 && r > 80 && g > 45 && b > r + 25;
+        return nearWhite || lavenderEdge;
     }
 
     //Timer
@@ -1323,54 +1388,76 @@ public class BattleScreen extends JPanel {
         int safeFrame = skillFrame % skillMaxFrames;
         int sx = safeFrame * skillFrameWidth;
 
-        // 1. Define the PIVOT point (The feet/center of the character)
-        // We use the static coordinates captured when the skill started
-        int baseX = skillByEnemy ? frozenEnemyX : frozenPlayerX;
-        int baseY = skillByEnemy ? frozenEnemyY : frozenPlayerY;
-        int baseW = skillByEnemy ? frozenEnemyW : frozenPlayerW;
-        int baseH = skillByEnemy ? frozenEnemyH : frozenPlayerH;
+        int baseX = skillByEnemy ? frozenEnemyVisibleX : frozenPlayerVisibleX;
+        int baseY = skillByEnemy ? frozenEnemyVisibleY : frozenPlayerVisibleY;
+        int baseW = skillByEnemy ? frozenEnemyVisibleW : frozenPlayerVisibleW;
+        int baseH = skillByEnemy ? frozenEnemyVisibleH : frozenPlayerVisibleH;
 
-        int pivotX = baseX + (baseW / 2);
-        int pivotY = baseY + baseH;
-
-        // 2. Calculate dimensions
-        int drawW, drawH;
-        if (isBloodmancer()) {
-            drawW = baseW;
-            drawH = baseH;
-        } else if (skillByEnemy && enemyCharacter.isFinalBoss()) {
-            // Force the height to match the original idle height
-            double aspect = (double) skillFrameWidth / skillFrameHeight;
-            drawH = baseH;
-            drawW = (int)(drawH * aspect);
-        } else {
-            drawW = baseW;
-            drawH = baseH;
+        if (baseW <= 0 || baseH <= 0) {
+            baseX = skillByEnemy ? frozenEnemyX : frozenPlayerX;
+            baseY = skillByEnemy ? frozenEnemyY : frozenPlayerY;
+            baseW = skillByEnemy ? frozenEnemyW : frozenPlayerW;
+            baseH = skillByEnemy ? frozenEnemyH : frozenPlayerH;
         }
 
-        Character skillOwner = skillByEnemy ? enemyCharacter : playerCharacter;
-        double skillRenderScale = skillOwner.getSkillRenderScale(activeSkillNumber);
-        drawW = (int)(drawW * skillRenderScale);
-        drawH = (int)(drawH * skillRenderScale);
-
-        // 3. PIVOT-BASED RENDERING
-        // drawX: Center the sprite at the pivot
-        // drawY: Bottom-align the sprite at the pivot
-        int drawX = pivotX - (drawW / 2);
-        int drawY = pivotY - drawH;
-        int horizontalOffset = skillOwner.getSkillHorizontalOffset(activeSkillNumber);
-        int verticalOffset = skillOwner.getSkillVerticalOffset(activeSkillNumber);
-        drawX += (int)(horizontalOffset * ((double) drawW / skillFrameWidth));
-        drawY += (int)(verticalOffset * ((double) drawH / skillFrameHeight));
+        Rectangle sourceBounds = findVisibleBounds(
+                skillSpriteSheet,
+                sx,
+                0,
+                skillFrameWidth,
+                skillFrameHeight
+        );
 
         g2.drawImage(
                 skillSpriteSheet,
-                drawX, drawY,
-                drawX + drawW, drawY + drawH,
-                sx, 0,
-                sx + skillFrameWidth, skillFrameHeight,
+                baseX, baseY,
+                baseX + baseW, baseY + baseH,
+                sourceBounds.x, sourceBounds.y,
+                sourceBounds.x + sourceBounds.width,
+                sourceBounds.y + sourceBounds.height,
                 null
         );
+    }
+
+    private Rectangle findVisibleBounds(BufferedImage img, int startX, int startY, int w, int h) {
+        int minX = startX + w;
+        int minY = startY + h;
+        int maxX = startX;
+        int maxY = startY;
+
+        for (int y = startY; y < startY + h; y++) {
+            for (int x = startX; x < startX + w; x++) {
+                int alpha = (img.getRGB(x, y) >> 24) & 0xFF;
+                if (alpha > 20) {
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
+                }
+            }
+        }
+
+        if (maxX < minX || maxY < minY) {
+            return new Rectangle(startX, startY, w, h);
+        }
+
+        return new Rectangle(minX, minY, maxX - minX + 1, maxY - minY + 1);
+    }
+
+    private Rectangle mapSourceBoundsToDest(Rectangle sourceBounds,
+                                            int sourceX, int sourceY,
+                                            int sourceW, int sourceH,
+                                            int destX, int destY,
+                                            int destW, int destH) {
+        double scaleX = (double)destW / Math.max(1, sourceW);
+        double scaleY = (double)destH / Math.max(1, sourceH);
+
+        int x = destX + (int)Math.round((sourceBounds.x - sourceX) * scaleX);
+        int y = destY + (int)Math.round((sourceBounds.y - sourceY) * scaleY);
+        int w = Math.max(1, (int)Math.round(sourceBounds.width * scaleX));
+        int h = Math.max(1, (int)Math.round(sourceBounds.height * scaleY));
+
+        return new Rectangle(x, y, w, h);
     }
     // ── End overlay ───────────────────────────────────────────────────────────
     private void drawEndOverlay(Graphics2D g2, int W, int H) {
