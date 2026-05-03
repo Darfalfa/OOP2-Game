@@ -42,6 +42,8 @@ public abstract class Player {
     BufferedImage[] walkingRightFrames             = new BufferedImage[28];
     BufferedImage[] walkingLeftFrames              = new BufferedImage[28];
     BufferedImage[] walkingBackwardFrames          = new BufferedImage[28];
+    BufferedImage[] walkingDiagonalUpLeftFrames    = new BufferedImage[28];
+    BufferedImage[] walkingDiagonalUpRightFrames   = new BufferedImage[28];
     BufferedImage[] walkingDiagonalDownLeftFrames  = new BufferedImage[24];
     BufferedImage[] walkingDiagonalDownRightFrames = new BufferedImage[24];
 
@@ -166,6 +168,95 @@ public abstract class Player {
         } catch (IOException e) {
             return fallback != null ? fallback : blankSprite();
         }
+    }
+
+    protected BufferedImage[] loadCharacterSpriteSequence(String pathPattern, int frameCount,
+                                                          BufferedImage[] fallbacks) {
+        BufferedImage[] strippedFrames = new BufferedImage[frameCount];
+        Rectangle[] boundsList = new Rectangle[frameCount];
+        BufferedImage[] outFrames = new BufferedImage[frameCount];
+        int maxBoundsW = 0;
+        int maxBoundsH = 0;
+
+        for (int i = 0; i < frameCount; i++) {
+            File file = new File(String.format(pathPattern, i + 1));
+            if (!file.exists()) {
+                outFrames[i] = fallbackAt(fallbacks, i);
+                continue;
+            }
+
+            try {
+                BufferedImage src = ImageIO.read(file);
+                if (src == null) {
+                    outFrames[i] = fallbackAt(fallbacks, i);
+                    continue;
+                }
+
+                BufferedImage argb = new BufferedImage(
+                        src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                Graphics2D tmp = argb.createGraphics();
+                tmp.drawImage(src, 0, 0, null);
+                tmp.dispose();
+
+                BufferedImage stripped = removeAutoBackground(argb);
+                Rectangle bounds = findOpaqueBounds(stripped);
+                if (bounds == null) {
+                    outFrames[i] = fallbackAt(fallbacks, i);
+                    continue;
+                }
+
+                strippedFrames[i] = stripped;
+                boundsList[i] = bounds;
+                maxBoundsW = Math.max(maxBoundsW, bounds.width);
+                maxBoundsH = Math.max(maxBoundsH, bounds.height);
+            } catch (IOException e) {
+                outFrames[i] = fallbackAt(fallbacks, i);
+            }
+        }
+
+        if (maxBoundsW == 0 || maxBoundsH == 0) {
+            return outFrames;
+        }
+
+        int maxW = (int)(SPRITE_W * 0.90);
+        int maxH = (int)(SPRITE_H * 0.94);
+        double ratio = Math.min((double) maxW / maxBoundsW,
+                (double) maxH / maxBoundsH);
+
+        for (int i = 0; i < frameCount; i++) {
+            if (strippedFrames[i] == null || boundsList[i] == null) {
+                if (outFrames[i] == null) outFrames[i] = fallbackAt(fallbacks, i);
+                continue;
+            }
+
+            Rectangle bounds = boundsList[i];
+            BufferedImage cropped = strippedFrames[i].getSubimage(
+                    bounds.x, bounds.y, bounds.width, bounds.height);
+
+            BufferedImage out = blankSprite();
+            Graphics2D g2 = out.createGraphics();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+            int drawW = Math.max(1, (int)Math.round(bounds.width * ratio));
+            int drawH = Math.max(1, (int)Math.round(bounds.height * ratio));
+            int drawX = (SPRITE_W - drawW) / 2;
+            int drawY = SPRITE_H - drawH - 2;
+
+            g2.drawImage(cropped, drawX, drawY, drawW, drawH, null);
+            g2.dispose();
+            outFrames[i] = out;
+        }
+
+        return outFrames;
+    }
+
+    private BufferedImage fallbackAt(BufferedImage[] fallbacks, int index) {
+        if (fallbacks != null && fallbacks.length > 0) {
+            BufferedImage fallback = fallbacks[index % fallbacks.length];
+            if (fallback != null) return fallback;
+        }
+        return blankSprite();
     }
 
     private BufferedImage blankSprite() {
@@ -445,9 +536,19 @@ public abstract class Player {
             }
         } else {
             switch (lastDirection) {
-                case "up":
+                case "up":        currentSprite = walkingBackwardFrames[backAnimFrame];   break;
                 case "upLeft":
-                case "upRight":   currentSprite = walkingBackwardFrames[backAnimFrame];   break;
+                    currentSprite = (walkingDiagonalUpLeftFrames != null
+                            && walkingDiagonalUpLeftFrames[0] != null)
+                            ? walkingDiagonalUpLeftFrames[backAnimFrame]
+                            : walkingBackwardFrames[backAnimFrame];
+                    break;
+                case "upRight":
+                    currentSprite = (walkingDiagonalUpRightFrames != null
+                            && walkingDiagonalUpRightFrames[0] != null)
+                            ? walkingDiagonalUpRightFrames[backAnimFrame]
+                            : walkingBackwardFrames[backAnimFrame];
+                    break;
                 case "down":      currentSprite = walkingForwardFrames[forwardAnimFrame]; break;
                 case "right":     currentSprite = walkingRightFrames[rightAnimFrame];     break;
                 case "left":      currentSprite = walkingLeftFrames[leftAnimFrame];       break;
