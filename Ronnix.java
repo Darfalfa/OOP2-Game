@@ -22,72 +22,49 @@ public class Ronnix extends Player {
 
     public Ronnix(GameScreen gp, KeyHandler keyH) {
         super(gp, keyH);
+        speed = 2;
         // Diagonal sheets have 24 frames vs 28 for forward walk.
         // Delay of 5 keeps the cycle duration the same as forward (28 * 4 = 112 ticks ≈ 24 * 5 = 120).
-        diagDownLeftAnimDelay  = 5;
-        diagDownRightAnimDelay = 5;
+        diagDownLeftAnimDelay  = 4;
+        diagDownRightAnimDelay = 4;
     }
 
     @Override
     protected void loadSprites() {
 
         // ── Walking forward — 28 pre-sliced transparent frames ────────────────────
-        walkingForwardFrames = new BufferedImage[28];
-        for (int i = 1; i <= 28; i++) {
-            walkingForwardFrames[i - 1] = loadDirect(
-                    String.format(DIR + "walkForward_f%02d.png", i));
-        }
+        walkingForwardFrames = loadCharacterSpriteSequence(DIR + "walkForward_f%02d.png", 28, null);
 
         // ── Standing — dedicated idle sprites for all 8 directions ───────────────
-        standingForward           = loadDirect(DIR + "standingForward.png");
-        standingBackward          = loadDirect(DIR + "standingBackward.png");
-        standingLeft              = loadDirect(DIR + "standingLeft.png");
-        standingRight             = loadDirect(DIR + "standingRight.png");
-        standingDiagonalUpLeft    = loadDirect(DIR + "standingDiagonalUpLeft.png");
-        standingDiagonalUpRight   = loadDirect(DIR + "standingDiagonalUpRight.png");
-        standingDiagonalDownLeft  = loadDirect(DIR + "standingDiagonalDownLeft.png");
-        standingDiagonalDownRight = loadDirect(DIR + "standingDiagonalDownRight.png");
-
         // ── Walking backward — 28 dedicated frames (sliced from sprite sheet) ─────
-        walkingBackwardFrames = new BufferedImage[28];
-        for (int i = 1; i <= 28; i++) {
-            walkingBackwardFrames[i - 1] = loadDirect(
-                    String.format(DIR + "walkBackward_f%02d.png", i));
-        }
-
-        // ── Walking left — 28 dedicated frames (sliced from 4-col × 7-row sheet) ──
-        // Uses loadWithBgStrip() because the source PNGs have a white/dotted background.
-        walkingLeftFrames = new BufferedImage[28];
-        for (int i = 1; i <= 28; i++) {
-            walkingLeftFrames[i - 1] = loadWithBgStrip(
-                    String.format(DIR + "walkLeft_f%02d.png", i),
-                    walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
-        }
+        walkingBackwardFrames = loadCharacterSpriteSequence(DIR + "walkBackward_f%02d.png", 28, walkingForwardFrames);
 
         // ── Walking right — 28 dedicated frames (sliced from 4-col × 7-row sheet) ──
         // Uses loadWithBgStrip() because the source PNGs have a white/dotted background.
-        walkingRightFrames = new BufferedImage[28];
-        for (int i = 1; i <= 28; i++) {
-            walkingRightFrames[i - 1] = loadWithBgStrip(
-                    String.format(DIR + "walkRight_f%02d.png", i),
-                    walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
-        }
+        walkingRightFrames = loadCharacterSpriteSequence(DIR + "walkRight_f%02d.png", 28, walkingForwardFrames);
 
-        // ── Diagonal down-left — 24 dedicated frames ──────────────────────────────
-        walkingDiagonalDownLeftFrames = new BufferedImage[24];
-        for (int i = 1; i <= 24; i++) {
-            walkingDiagonalDownLeftFrames[i - 1] = tryLoad(
-                    String.format(DIR + "walkDiagonalDownLeft_f%02d.png", i),
-                    walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
-        }
+        // Mirror the smooth right-walk cycle so left uses the same timing, size, and anchor.
+        walkingLeftFrames = mirrorFramesHorizontally(walkingRightFrames);
 
-        // ── Diagonal down-right — 24 dedicated frames ─────────────────────────────
-        walkingDiagonalDownRightFrames = new BufferedImage[24];
-        for (int i = 1; i <= 24; i++) {
-            walkingDiagonalDownRightFrames[i - 1] = tryLoad(
-                    String.format(DIR + "walkDiagonalDownRight_f%02d.png", i),
-                    walkingForwardFrames[(i - 1) % walkingForwardFrames.length]);
-        }
+        walkingDiagonalUpRightFrames = loadCharacterSpriteSequence(
+                DIR + "walkDiagonalUpRight_f%02d.png", 28, walkingBackwardFrames);
+
+        walkingDiagonalUpLeftFrames = mirrorFramesHorizontally(walkingDiagonalUpRightFrames);
+
+        // ── Diagonal down-right — 28 dedicated frames ─────────────────────────────
+        walkingDiagonalDownRightFrames = loadCharacterSpriteSequence(
+                DIR + "walkDiagonalDownRight_f%02d.png", 28, walkingForwardFrames);
+
+        walkingDiagonalDownLeftFrames = mirrorFramesHorizontally(walkingDiagonalDownRightFrames);
+
+        standingForward           = walkingForwardFrames[0];
+        standingBackward          = walkingBackwardFrames[0];
+        standingLeft              = walkingLeftFrames[0];
+        standingRight             = walkingRightFrames[0];
+        standingDiagonalUpLeft    = walkingDiagonalUpLeftFrames[0];
+        standingDiagonalUpRight   = walkingDiagonalUpRightFrames[0];
+        standingDiagonalDownLeft  = walkingDiagonalDownLeftFrames[0];
+        standingDiagonalDownRight = walkingDiagonalDownRightFrames[0];
     }
 
     /**

@@ -42,6 +42,8 @@ public abstract class Player {
     BufferedImage[] walkingRightFrames             = new BufferedImage[28];
     BufferedImage[] walkingLeftFrames              = new BufferedImage[28];
     BufferedImage[] walkingBackwardFrames          = new BufferedImage[28];
+    BufferedImage[] walkingDiagonalUpLeftFrames    = new BufferedImage[28];
+    BufferedImage[] walkingDiagonalUpRightFrames   = new BufferedImage[28];
     BufferedImage[] walkingDiagonalDownLeftFrames  = new BufferedImage[24];
     BufferedImage[] walkingDiagonalDownRightFrames = new BufferedImage[24];
 
@@ -148,7 +150,7 @@ public abstract class Player {
             BufferedImage out = blankSprite();
             Graphics2D g2 = out.createGraphics();
             g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
 
             int maxW = (int)(SPRITE_W * 0.90);
             int maxH = (int)(SPRITE_H * 0.94);
@@ -166,6 +168,140 @@ public abstract class Player {
         } catch (IOException e) {
             return fallback != null ? fallback : blankSprite();
         }
+    }
+
+    protected BufferedImage[] loadCharacterSpriteSequence(String pathPattern, int frameCount,
+                                                          BufferedImage[] fallbacks) {
+        return loadCharacterSpriteSequence(pathPattern, frameCount, fallbacks, true);
+    }
+
+    protected BufferedImage[] loadCenteredCharacterSpriteSequence(String pathPattern, int frameCount,
+                                                                  BufferedImage[] fallbacks) {
+        return loadCharacterSpriteSequence(pathPattern, frameCount, fallbacks, false);
+    }
+
+    private BufferedImage[] loadCharacterSpriteSequence(String pathPattern, int frameCount,
+                                                        BufferedImage[] fallbacks,
+                                                        boolean preserveSourceOffsets) {
+        BufferedImage[] strippedFrames = new BufferedImage[frameCount];
+        Rectangle[] boundsList = new Rectangle[frameCount];
+        BufferedImage[] outFrames = new BufferedImage[frameCount];
+        int unionMinX = Integer.MAX_VALUE;
+        int unionMinY = Integer.MAX_VALUE;
+        int unionMaxX = -1;
+        int unionMaxY = -1;
+
+        for (int i = 0; i < frameCount; i++) {
+            File file = new File(String.format(pathPattern, i + 1));
+            if (!file.exists()) {
+                outFrames[i] = fallbackAt(fallbacks, i);
+                continue;
+            }
+
+            try {
+                BufferedImage src = ImageIO.read(file);
+                if (src == null) {
+                    outFrames[i] = fallbackAt(fallbacks, i);
+                    continue;
+                }
+
+                BufferedImage argb = new BufferedImage(
+                        src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+                Graphics2D tmp = argb.createGraphics();
+                tmp.drawImage(src, 0, 0, null);
+                tmp.dispose();
+
+                BufferedImage stripped = removeAutoBackground(argb);
+                Rectangle bounds = findOpaqueBounds(stripped);
+                if (bounds == null) {
+                    outFrames[i] = fallbackAt(fallbacks, i);
+                    continue;
+                }
+
+                strippedFrames[i] = stripped;
+                boundsList[i] = bounds;
+                unionMinX = Math.min(unionMinX, bounds.x);
+                unionMinY = Math.min(unionMinY, bounds.y);
+                unionMaxX = Math.max(unionMaxX, bounds.x + bounds.width - 1);
+                unionMaxY = Math.max(unionMaxY, bounds.y + bounds.height - 1);
+            } catch (IOException e) {
+                outFrames[i] = fallbackAt(fallbacks, i);
+            }
+        }
+
+        if (unionMaxX < unionMinX || unionMaxY < unionMinY) {
+            return outFrames;
+        }
+
+        Rectangle sequenceBounds = new Rectangle(
+                unionMinX, unionMinY,
+                unionMaxX - unionMinX + 1,
+                unionMaxY - unionMinY + 1);
+        int maxW = (int)(SPRITE_W * 0.90);
+        int maxH = (int)(SPRITE_H * 0.94);
+        double ratio = Math.min((double) maxW / sequenceBounds.width,
+                (double) maxH / sequenceBounds.height);
+        int drawW = Math.max(1, (int)Math.round(sequenceBounds.width * ratio));
+        int drawH = Math.max(1, (int)Math.round(sequenceBounds.height * ratio));
+        int drawX = (SPRITE_W - drawW) / 2;
+        int drawY = SPRITE_H - drawH - 2;
+
+        for (int i = 0; i < frameCount; i++) {
+            if (strippedFrames[i] == null || boundsList[i] == null) {
+                if (outFrames[i] == null) outFrames[i] = fallbackAt(fallbacks, i);
+                continue;
+            }
+
+            Rectangle drawBounds = preserveSourceOffsets ? sequenceBounds : boundsList[i];
+            BufferedImage cropped = strippedFrames[i].getSubimage(
+                    drawBounds.x, drawBounds.y, drawBounds.width, drawBounds.height);
+
+            BufferedImage out = blankSprite();
+            Graphics2D g2 = out.createGraphics();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+
+            if (preserveSourceOffsets) {
+                g2.drawImage(cropped, drawX, drawY, drawW, drawH, null);
+            } else {
+                int centeredW = Math.max(1, (int)Math.round(drawBounds.width * ratio));
+                int centeredH = Math.max(1, (int)Math.round(drawBounds.height * ratio));
+                int centeredX = (SPRITE_W - centeredW) / 2;
+                int centeredY = SPRITE_H - centeredH - 2;
+                g2.drawImage(cropped, centeredX, centeredY, centeredW, centeredH, null);
+            }
+            g2.dispose();
+            outFrames[i] = out;
+        }
+
+        return outFrames;
+    }
+
+    protected BufferedImage[] mirrorFramesHorizontally(BufferedImage[] sourceFrames) {
+        if (sourceFrames == null) return new BufferedImage[0];
+
+        BufferedImage[] mirroredFrames = new BufferedImage[sourceFrames.length];
+        for (int i = 0; i < sourceFrames.length; i++) {
+            BufferedImage source = sourceFrames[i] != null ? sourceFrames[i] : blankSprite();
+            BufferedImage mirrored = new BufferedImage(
+                    source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2 = mirrored.createGraphics();
+            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g2.drawImage(source, source.getWidth(), 0, -source.getWidth(), source.getHeight(), null);
+            g2.dispose();
+            mirroredFrames[i] = mirrored;
+        }
+
+        return mirroredFrames;
+    }
+
+    private BufferedImage fallbackAt(BufferedImage[] fallbacks, int index) {
+        if (fallbacks != null && fallbacks.length > 0) {
+            BufferedImage fallback = fallbacks[index % fallbacks.length];
+            if (fallback != null) return fallback;
+        }
+        return blankSprite();
     }
 
     private BufferedImage blankSprite() {
@@ -204,14 +340,15 @@ public abstract class Player {
 
         boolean[][] visited = new boolean[w][h];
         java.util.Queue<int[]> queue = new java.util.LinkedList<>();
+        boolean transparentEdge = hasTransparentEdge(dst);
 
         for (int x = 0; x < w; x++) {
-            enqueueAutoBackground(dst, x, 0, visited, queue);
-            enqueueAutoBackground(dst, x, h - 1, visited, queue);
+            enqueueAutoBackground(dst, x, 0, visited, queue, transparentEdge);
+            enqueueAutoBackground(dst, x, h - 1, visited, queue, transparentEdge);
         }
         for (int y = 1; y < h - 1; y++) {
-            enqueueAutoBackground(dst, 0, y, visited, queue);
-            enqueueAutoBackground(dst, w - 1, y, visited, queue);
+            enqueueAutoBackground(dst, 0, y, visited, queue, transparentEdge);
+            enqueueAutoBackground(dst, w - 1, y, visited, queue, transparentEdge);
         }
 
         while (!queue.isEmpty()) {
@@ -220,18 +357,35 @@ public abstract class Player {
             int cy = px[1];
             dst.setRGB(cx, cy, 0x00000000);
 
-            enqueueAutoBackground(dst, cx - 1, cy, visited, queue);
-            enqueueAutoBackground(dst, cx + 1, cy, visited, queue);
-            enqueueAutoBackground(dst, cx, cy - 1, visited, queue);
-            enqueueAutoBackground(dst, cx, cy + 1, visited, queue);
+            enqueueAutoBackground(dst, cx - 1, cy, visited, queue, transparentEdge);
+            enqueueAutoBackground(dst, cx + 1, cy, visited, queue, transparentEdge);
+            enqueueAutoBackground(dst, cx, cy - 1, visited, queue, transparentEdge);
+            enqueueAutoBackground(dst, cx, cy + 1, visited, queue, transparentEdge);
         }
 
         return dst;
     }
 
+    private boolean hasTransparentEdge(BufferedImage img) {
+        int w = img.getWidth();
+        int h = img.getHeight();
+
+        for (int x = 0; x < w; x++) {
+            if (((img.getRGB(x, 0) >> 24) & 0xFF) <= 8) return true;
+            if (((img.getRGB(x, h - 1) >> 24) & 0xFF) <= 8) return true;
+        }
+        for (int y = 1; y < h - 1; y++) {
+            if (((img.getRGB(0, y) >> 24) & 0xFF) <= 8) return true;
+            if (((img.getRGB(w - 1, y) >> 24) & 0xFF) <= 8) return true;
+        }
+
+        return false;
+    }
+
     private void enqueueAutoBackground(BufferedImage img, int x, int y,
                                        boolean[][] visited,
-                                       java.util.Queue<int[]> queue) {
+                                       java.util.Queue<int[]> queue,
+                                       boolean transparentEdge) {
         int w = img.getWidth();
         int h = img.getHeight();
         if (x < 0 || y < 0 || x >= w || y >= h) return;
@@ -245,11 +399,16 @@ public abstract class Player {
         int b = argb & 0xFF;
 
         boolean transparent = a <= 8;
+        if (transparentEdge) {
+            if (transparent) queue.add(new int[]{x, y});
+            return;
+        }
+
         boolean nearWhite = r > 190 && g > 190 && b > 190
                 && Math.abs(r - g) < 45
                 && Math.abs(r - b) < 45
                 && Math.abs(g - b) < 45;
-        boolean nearBlack = r < 28 && g < 28 && b < 28;
+        boolean nearBlack = r < 4 && g < 4 && b < 4;
         boolean lavenderDots = b > 170 && r > 100 && g < 150;
 
         if (transparent || nearWhite || nearBlack || lavenderDots) {
@@ -445,9 +604,19 @@ public abstract class Player {
             }
         } else {
             switch (lastDirection) {
-                case "up":
+                case "up":        currentSprite = walkingBackwardFrames[backAnimFrame];   break;
                 case "upLeft":
-                case "upRight":   currentSprite = walkingBackwardFrames[backAnimFrame];   break;
+                    currentSprite = (walkingDiagonalUpLeftFrames != null
+                            && walkingDiagonalUpLeftFrames[0] != null)
+                            ? walkingDiagonalUpLeftFrames[backAnimFrame]
+                            : walkingBackwardFrames[backAnimFrame];
+                    break;
+                case "upRight":
+                    currentSprite = (walkingDiagonalUpRightFrames != null
+                            && walkingDiagonalUpRightFrames[0] != null)
+                            ? walkingDiagonalUpRightFrames[backAnimFrame]
+                            : walkingBackwardFrames[backAnimFrame];
+                    break;
                 case "down":      currentSprite = walkingForwardFrames[forwardAnimFrame]; break;
                 case "right":     currentSprite = walkingRightFrames[rightAnimFrame];     break;
                 case "left":      currentSprite = walkingLeftFrames[leftAnimFrame];       break;
