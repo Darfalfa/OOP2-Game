@@ -27,7 +27,7 @@ public class MainMenuScreen extends JPanel {
     private static final Color SMOKE_BG   = new Color(15, 8, 5);
 
     // Menu items
-    private static final String[] LABELS = { "START GAME", "SETTINGS", "EXIT GAME" };
+    private static final String[] LABELS = { "START GAME", "SETTINGS", "LEADERBOARD", "EXIT GAME" };
     private int hoveredIndex = -1;
     private Rectangle[] buttonRects = new Rectangle[LABELS.length];
 
@@ -93,12 +93,18 @@ public class MainMenuScreen extends JPanel {
     private void handleAction(int index) {
         switch (index) {
             case 0 -> {
-                window.showCharacterSelect();
+                if (window.getPlayerName().trim().isEmpty()) {
+                    window.showNameEntry();
+                } else {
+                    window.showCharacterSelect();
+                }
             }
 
             case 1 -> window.showSettings();
 
-            case 2 -> {
+            case 2 -> window.showLeaderboard();
+
+            case 3 -> {
                 int choice = JOptionPane.showConfirmDialog(
                     this, "Are you sure you want to exit?",
                     "Exit Game", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
@@ -246,12 +252,13 @@ public class MainMenuScreen extends JPanel {
 
     private void drawMenuButtons(Graphics2D g2, int W, int H) {
         int btnW = 500, btnH = 56;
-        int startY = (int)(H * 0.65);
-        int gap = 68;
+        int gap = 14;
+        int totalH = LABELS.length * btnH + (LABELS.length - 1) * gap;
+        int startY = Math.min((int)(H * 0.67), H - totalH - 32);
 
         for (int i = 0; i < LABELS.length; i++) {
             int bx = (W - btnW) / 2;
-            int by = startY + i * gap;
+            int by = startY + i * (btnH + gap);
             buttonRects[i] = new Rectangle(bx, by, btnW, btnH);
             drawButton(g2, LABELS[i], bx, by, btnW, btnH, hoveredIndex == i, i);
         }

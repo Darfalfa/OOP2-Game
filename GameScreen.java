@@ -181,6 +181,20 @@ public class GameScreen extends JPanel implements Runnable {
     private static final int MESSAGE_DURATION = 120;
     private boolean shopMessageIsError = true;
 
+    private static final int SHOP_INTERACT_RANGE = 110;
+    private static final Point WORLD_1_SHOP = new Point(1809, 1800);
+    private static final Point WORLD_2_SHOP = new Point(2305, 1045);
+    private static final Point WORLD_3_SHOP = new Point(2161, 1226);
+
+    // Adjust these two values to make the fade transition faster or slower.
+    private static final int FADE_STEP_MS = 16;
+    private static final float FADE_ALPHA_STEP = 0.06f;
+    private float transitionAlpha = 0f;
+    private boolean transitionRunning = false;
+    private boolean transitionFadingOut = true;
+    private Runnable transitionAction = null;
+    private Timer transitionTimer = null;
+
 
 
     public GameScreen(GameWindow window) {
@@ -427,8 +441,8 @@ public class GameScreen extends JPanel implements Runnable {
                     if (dialogueShopBtn != null && dialogueShopBtn.contains(p)) {
                         SoundManager.stopSfx();
                         shopDialogueOpen = false;
-                        shopOpen = true;
                         dialogueHovered = -1;
+                        startFadeTransition(() -> shopOpen = true);
                         repaint();
                         return;
                     }
@@ -1146,6 +1160,8 @@ public class GameScreen extends JPanel implements Runnable {
         keyH.rightPressed = false;
 
         if (won) {
+            window.recordMonsterKill(playerCharacter != null ? playerCharacter.getLevel() : 1);
+
             if (isBoss(defeated.character)) {
                 enemies.remove(defeated);
 
@@ -1326,6 +1342,10 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     private void update() {
+        if (transitionRunning) {
+            clearMovementInput();
+            return;
+        }
                 if (spawnFreezeFrames > 0) {
             spawnFreezeFrames--;
 
@@ -1363,6 +1383,7 @@ public class GameScreen extends JPanel implements Runnable {
             spawnEnemies();
 
             int lvl = playerCharacter.getLevel();
+            SaveManager.savePlayer(window.getPlayerName(), lvl, window.getMonstersKilled());
 
             if (lvl >= 10 && !endingChoiceOpen && !endingChosen) {
                 enemies.clear();
@@ -1380,20 +1401,21 @@ public class GameScreen extends JPanel implements Runnable {
             }
 
             if (lvl == 4 && !storyTriggered[4]) {
-                switchWorld(2);
-
-                showStory("WORLD_2_START");
-                storyTriggered[4] = true;
-
-                showWensAfterStory = true;
-                wensDialogueSeen = true;
+                startFadeTransition(() -> {
+                    switchWorld(2);
+                    showStory("WORLD_2_START");
+                    storyTriggered[4] = true;
+                    showWensAfterStory = true;
+                    wensDialogueSeen = true;
+                });
             }
 
             if (lvl == 7 && !storyTriggered[7]) {
-                switchWorld(3);
-
-                showStory("WORLD_3_START");
-                storyTriggered[7] = true;
+                startFadeTransition(() -> {
+                    switchWorld(3);
+                    showStory("WORLD_3_START");
+                    storyTriggered[7] = true;
+                });
             }
 
 
@@ -1427,7 +1449,8 @@ public class GameScreen extends JPanel implements Runnable {
                 int playerLevel = playerCharacter != null ? playerCharacter.getLevel() : 1;
                 if (dungeonManager.canEnterDungeon(currentWorld, dungeonToEnter, playerLevel)) {
                     blockedDungeonWarning = 0;
-                    switchToDungeon(dungeonToEnter);
+                    final int targetDungeon = dungeonToEnter;
+                    startFadeTransition(() -> switchToDungeon(targetDungeon));
                     return;
                 } else {
                     if (blockedDungeonWarning != dungeonToEnter) {
@@ -1467,7 +1490,7 @@ public class GameScreen extends JPanel implements Runnable {
                     return;
                 }
 
-                switchToWorld();
+                startFadeTransition(this::switchToWorld);
                 return;
             }
         }
@@ -1619,6 +1642,25 @@ public class GameScreen extends JPanel implements Runnable {
         shopFeedbackTimer = FEEDBACK_DURATION;
     }
 
+    private Point getCurrentShopPoint() {
+        return switch (currentWorld) {
+            case 1 -> WORLD_1_SHOP;
+            case 2 -> WORLD_2_SHOP;
+            case 3 -> WORLD_3_SHOP;
+            default -> WORLD_1_SHOP;
+        };
+    }
+
+    private boolean isNearCurrentWorldShop() {
+        if (player == null || dungeonManager.isInDungeon()) return false;
+
+        Point shop = getCurrentShopPoint();
+        int playerCenterX = player.x + Player.SPRITE_W / 2;
+        int playerCenterY = player.y + Player.SPRITE_H / 2;
+
+        return Math.hypot(playerCenterX - shop.x, playerCenterY - shop.y) <= SHOP_INTERACT_RANGE;
+    }
+
     //public void openShopDialogue() {
     //    if (!shopOpen && !shopDialogueOpen) {
     //        shopDialogueOpen = true;
@@ -1628,7 +1670,7 @@ public class GameScreen extends JPanel implements Runnable {
     //}
 
     public void openShopDialogue() {
-        if (!shopOpen && !shopDialogueOpen && !wensDialogueOpen && !khaiDialogueOpen) {
+        if (!shopOpen && !shopDialogueOpen && !wensDialogueOpen && !khaiDialogueOpen && isNearCurrentWorldShop()) {
             shopDialogueOpen = true;
             selectedOption = 0;
 
@@ -1705,6 +1747,55 @@ public class GameScreen extends JPanel implements Runnable {
 
     public boolean isDialogueOpen() {
         return storyOpen || puzzlePiecePopupOpen || dungeonIntroPopupOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
+    }
+
+    private void startFadeTransition(Runnable action) {
+        if (transitionRunning) return;
+
+        transitionAction = action;
+        transitionRunning = true;
+        transitionFadingOut = true;
+        transitionAlpha = 0f;
+        clearMovementInput();
+
+        if (transitionTimer != null) {
+            transitionTimer.stop();
+        }
+
+        transitionTimer = new Timer(FADE_STEP_MS, e -> {
+            if (transitionFadingOut) {
+                transitionAlpha += FADE_ALPHA_STEP;
+                if (transitionAlpha >= 1f) {
+                    transitionAlpha = 1f;
+                    if (transitionAction != null) {
+                        transitionAction.run();
+                        transitionAction = null;
+                    }
+                    transitionFadingOut = false;
+                }
+            } else {
+                transitionAlpha -= FADE_ALPHA_STEP;
+                if (transitionAlpha <= 0f) {
+                    transitionAlpha = 0f;
+                    transitionRunning = false;
+                    ((Timer)e.getSource()).stop();
+                    requestFocusInWindow();
+                }
+            }
+            repaint();
+        });
+
+        transitionTimer.start();
+    }
+
+    private void drawFadeTransition(Graphics2D g2) {
+        if (transitionAlpha <= 0f) return;
+
+        Composite oldComposite = g2.getComposite();
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.min(1f, transitionAlpha)));
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, getWidth(), getHeight());
+        g2.setComposite(oldComposite);
     }
 
         public void toggleCollisionDebug() {
@@ -1827,6 +1918,8 @@ public class GameScreen extends JPanel implements Runnable {
         if (settingsOpen) {
             drawGameSettings(g2);
         }
+
+        drawFadeTransition(g2);
 
         g2.dispose();
     }

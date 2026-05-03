@@ -63,9 +63,9 @@ public class ShadowLogic extends Character {
     @Override
     public String getSkillSfx(int skillNumber) {
         return switch (skillNumber) {
-            case 1 -> "Shadow.wav";
-            case 2 -> "Shadow.wav";
-            case 3 -> "Shadow.wav";
+            case 1 -> "W1_M1.wav";
+            case 2 -> "W1_M1.wav";
+            case 3 -> "W1_M1.wav";
             default -> null;
         };
     }

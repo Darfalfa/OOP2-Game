@@ -12,8 +12,10 @@ public class GameWindow extends JFrame {
 
     public static final String SCREEN_LOADING   = "LOADING";
     public static final String SCREEN_MAIN      = "MAIN";
+    public static final String SCREEN_NAME      = "NAME";
     public static final String SCREEN_CHARACTER = "CHARACTER";
     public static final String SCREEN_SETTINGS  = "SETTINGS";
+    public static final String SCREEN_LEADERBOARD = "LEADERBOARD";
     public static final String SCREEN_GAME      = "GAME";
     public static final String SCREEN_BATTLE    = "BATTLE";
 
@@ -26,6 +28,8 @@ public class GameWindow extends JFrame {
     public int musicVol = 80;
     public int sfxVol = 70;
     public boolean fullscreen = false;
+    private String playerName = "";
+    private int monstersKilled = 0;
 
     public GameWindow() {
         setTitle("Great Ruins of Khai");
@@ -46,8 +50,10 @@ public class GameWindow extends JFrame {
 
         root.add(loadingScreen,                   SCREEN_LOADING);
         root.add(new MainMenuScreen(this),        SCREEN_MAIN);
+        root.add(new NameEntryScreen(this),       SCREEN_NAME);
         root.add(new CharacterSelectScreen(this), SCREEN_CHARACTER);
         root.add(new SettingsScreen(this),        SCREEN_SETTINGS);
+        root.add(new LeaderboardScreen(this),     SCREEN_LEADERBOARD);
         root.add(gameScreen,                      SCREEN_GAME);
         root.add(battleScreen,                    SCREEN_BATTLE);
 
@@ -69,9 +75,32 @@ public class GameWindow extends JFrame {
     public void showMainMenu()        { 
         SoundManager.playBgm("title.wav");
         cardLayout.show(root, SCREEN_MAIN);      }
+    public void showNameEntry()       { cardLayout.show(root, SCREEN_NAME);      }
     public void showCharacterSelect() { cardLayout.show(root, SCREEN_CHARACTER); }
     public void showSettings()        { cardLayout.show(root, SCREEN_SETTINGS);  }
+    public void showLeaderboard()     { cardLayout.show(root, SCREEN_LEADERBOARD); }
     public void showGameScreen()      { cardLayout.show(root, SCREEN_GAME);      }
+
+    public String getPlayerName() {
+        return playerName;
+    }
+
+    public void setPlayerName(String playerName) {
+        this.playerName = SaveManager.cleanName(playerName);
+    }
+
+    public int getMonstersKilled() {
+        return monstersKilled;
+    }
+
+    public void setMonstersKilled(int monstersKilled) {
+        this.monstersKilled = Math.max(0, monstersKilled);
+    }
+
+    public void recordMonsterKill(int level) {
+        monstersKilled++;
+        SaveManager.savePlayer(playerName, level, monstersKilled);
+    }
 
     /**
      * Called by CharacterSelectScreen after a character is chosen.
