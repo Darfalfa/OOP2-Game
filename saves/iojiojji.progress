@@ -1,0 +1,21 @@
+#Great Ruins of Khai progress save
+#Mon May 04 05:44:20 PST 2026
+playerX=1080
+currentXp=0
+level=1
+hp=90
+monstersKilled=0
+puzzlePieces=false,false,false,false
+playerY=1044
+expPotion=0
+dungeon=0
+gold=0
+healthPotion=0
+character=Aya
+world=1
+khaiDialogueTriggered=false,false,false,false,false,false,false,false,false,false
+inDungeon=false
+defense=8
+puzzlePieceCount=0
+name=iojiojji
+storyTriggered=false,true,false,false,false,false,false,false,false,false,false

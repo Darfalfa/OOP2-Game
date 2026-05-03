@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Properties;
 
 public class SaveManager {
 
@@ -25,6 +26,28 @@ public class SaveManager {
             this.level = level;
             this.monstersKilled = monstersKilled;
         }
+    }
+
+    public static class GameSave {
+        public String name = "Player";
+        public String character = "Unknown";
+        public int level = 1;
+        public int monstersKilled = 0;
+        public int world = 1;
+        public boolean inDungeon = false;
+        public int dungeon = 0;
+        public int playerX = 0;
+        public int playerY = 0;
+        public int hp = 0;
+        public int defense = 0;
+        public int currentXp = 0;
+        public int gold = 0;
+        public int healthPotion = 0;
+        public int expPotion = 0;
+        public int puzzlePieceCount = 0;
+        public boolean[] puzzlePieces = new boolean[4];
+        public boolean[] storyTriggered = new boolean[11];
+        public boolean[] khaiDialogueTriggered = new boolean[10];
     }
 
     public static List<SaveRecord> loadLeaderboard() {
@@ -102,6 +125,65 @@ public class SaveManager {
         return false;
     }
 
+    public static List<GameSave> loadGameSaves() {
+        ensureSaveFile();
+        List<GameSave> saves = new ArrayList<>();
+        File[] files = SAVE_DIR.listFiles((dir, fileName) -> fileName.endsWith(".progress"));
+        if (files == null) return saves;
+
+        for (File file : files) {
+            GameSave save = loadGameSaveFile(file);
+            if (save != null) {
+                saves.add(save);
+            }
+        }
+
+        saves.sort(Comparator.comparing(s -> s.name.toLowerCase()));
+        return saves;
+    }
+
+    public static GameSave loadGameSave(String name) {
+        File file = progressFile(name);
+        if (!file.exists()) return null;
+        return loadGameSaveFile(file);
+    }
+
+    public static void saveGameProgress(GameSave save) {
+        ensureSaveFile();
+        if (save == null) return;
+
+        save.name = cleanName(save.name);
+        save.character = cleanCharacter(save.character);
+        savePlayer(save.name, save.character, save.level, save.monstersKilled);
+
+        Properties props = new Properties();
+        props.setProperty("name", save.name);
+        props.setProperty("character", save.character);
+        props.setProperty("level", String.valueOf(save.level));
+        props.setProperty("monstersKilled", String.valueOf(save.monstersKilled));
+        props.setProperty("world", String.valueOf(save.world));
+        props.setProperty("inDungeon", String.valueOf(save.inDungeon));
+        props.setProperty("dungeon", String.valueOf(save.dungeon));
+        props.setProperty("playerX", String.valueOf(save.playerX));
+        props.setProperty("playerY", String.valueOf(save.playerY));
+        props.setProperty("hp", String.valueOf(save.hp));
+        props.setProperty("defense", String.valueOf(save.defense));
+        props.setProperty("currentXp", String.valueOf(save.currentXp));
+        props.setProperty("gold", String.valueOf(save.gold));
+        props.setProperty("healthPotion", String.valueOf(save.healthPotion));
+        props.setProperty("expPotion", String.valueOf(save.expPotion));
+        props.setProperty("puzzlePieceCount", String.valueOf(save.puzzlePieceCount));
+        props.setProperty("puzzlePieces", joinBooleans(save.puzzlePieces));
+        props.setProperty("storyTriggered", joinBooleans(save.storyTriggered));
+        props.setProperty("khaiDialogueTriggered", joinBooleans(save.khaiDialogueTriggered));
+
+        try (FileWriter writer = new FileWriter(progressFile(save.name))) {
+            props.store(writer, "Great Ruins of Khai progress save");
+        } catch (IOException e) {
+            System.err.println("Could not write progress save.");
+        }
+    }
+
     public static String cleanName(String name) {
         String clean = name == null ? "" : name.trim();
         if (clean.isEmpty()) {
@@ -144,6 +226,69 @@ public class SaveManager {
             }
         } catch (IOException e) {
             System.err.println("Could not write leaderboard save file.");
+        }
+    }
+
+    private static GameSave loadGameSaveFile(File file) {
+        Properties props = new Properties();
+        try (FileReader reader = new FileReader(file)) {
+            props.load(reader);
+        } catch (IOException e) {
+            return null;
+        }
+
+        GameSave save = new GameSave();
+        save.name = cleanName(props.getProperty("name", "Player"));
+        save.character = cleanCharacter(props.getProperty("character", "Unknown"));
+        save.level = intProp(props, "level", 1);
+        save.monstersKilled = intProp(props, "monstersKilled", 0);
+        save.world = intProp(props, "world", 1);
+        save.inDungeon = Boolean.parseBoolean(props.getProperty("inDungeon", "false"));
+        save.dungeon = intProp(props, "dungeon", 0);
+        save.playerX = intProp(props, "playerX", 0);
+        save.playerY = intProp(props, "playerY", 0);
+        save.hp = intProp(props, "hp", 0);
+        save.defense = intProp(props, "defense", 0);
+        save.currentXp = intProp(props, "currentXp", 0);
+        save.gold = intProp(props, "gold", 0);
+        save.healthPotion = intProp(props, "healthPotion", 0);
+        save.expPotion = intProp(props, "expPotion", 0);
+        save.puzzlePieceCount = intProp(props, "puzzlePieceCount", 0);
+        readBooleans(props.getProperty("puzzlePieces", ""), save.puzzlePieces);
+        readBooleans(props.getProperty("storyTriggered", ""), save.storyTriggered);
+        readBooleans(props.getProperty("khaiDialogueTriggered", ""), save.khaiDialogueTriggered);
+        return save;
+    }
+
+    private static File progressFile(String name) {
+        return new File(SAVE_DIR, safeFileName(cleanName(name)) + ".progress");
+    }
+
+    private static String safeFileName(String name) {
+        return name.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    private static int intProp(Properties props, String key, int fallback) {
+        try {
+            return Integer.parseInt(props.getProperty(key, String.valueOf(fallback)));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static String joinBooleans(boolean[] values) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(values[i]);
+        }
+        return sb.toString();
+    }
+
+    private static void readBooleans(String value, boolean[] target) {
+        String[] parts = value.split(",");
+        for (int i = 0; i < target.length && i < parts.length; i++) {
+            target[i] = Boolean.parseBoolean(parts[i].trim());
         }
     }
 

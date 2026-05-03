@@ -112,8 +112,14 @@ public class GameScreen extends JPanel implements Runnable {
     private boolean settingsBtnHovered = false;
     private boolean settingsOpen = false;
     private Rectangle gameMusicTrack, gameSfxTrack, gameMusicSlider, gameSfxSlider;
-    private Rectangle gameFullscreenBtn, gameSettingsCloseBtn;
+    private Rectangle gameFullscreenBtn, gameSettingsCloseBtn, gameSettingsSaveBtn;
     private String gameSettingsDragging = null;
+    private String saveFeedback = "";
+    private int saveFeedbackTimer = 0;
+    private boolean progressSavedThisSession = false;
+    private boolean unsavedMainMenuPromptOpen = false;
+    private Rectangle unsavedSaveBtn;
+    private Rectangle unsavedDiscardBtn;
 
     private Rectangle nextLevelBtn;
 
@@ -256,6 +262,7 @@ public class GameScreen extends JPanel implements Runnable {
                     boolean overSettings = (gameMusicSlider != null && gameMusicSlider.contains(p)) ||
                             (gameSfxSlider != null && gameSfxSlider.contains(p)) ||
                             (gameFullscreenBtn != null && gameFullscreenBtn.contains(p)) ||
+                            (gameSettingsSaveBtn != null && gameSettingsSaveBtn.contains(p)) ||
                             (gameSettingsCloseBtn != null && gameSettingsCloseBtn.contains(p));
                     setCursor(overSettings ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
                     return;
@@ -334,10 +341,28 @@ public class GameScreen extends JPanel implements Runnable {
             @Override
             public void mouseClicked(MouseEvent e) {
                 Point p = e.getPoint();
+                if (unsavedMainMenuPromptOpen) {
+                    if (unsavedSaveBtn != null && unsavedSaveBtn.contains(p)) {
+                        saveProgress();
+                        proceedToMainMenu();
+                        return;
+                    }
+                    if (unsavedDiscardBtn != null && unsavedDiscardBtn.contains(p)) {
+                        proceedToMainMenu();
+                        return;
+                    }
+                    return;
+                }
+
                 if (settingsOpen) {
                     if (gameFullscreenBtn != null && gameFullscreenBtn.contains(p)) {
                         window.fullscreen = !window.fullscreen;
                         window.setFullscreen(window.fullscreen);
+                        repaint();
+                        return;
+                    }
+                    if (gameSettingsSaveBtn != null && gameSettingsSaveBtn.contains(p)) {
+                        saveProgress();
                         repaint();
                         return;
                     }
@@ -847,6 +872,7 @@ public class GameScreen extends JPanel implements Runnable {
     public void startGame() {
 
         navigatingToMenu = false;
+        progressSavedThisSession = false;
 
         if (playerCharacter == null) {
             setSelectedCharacter(selectedCharacter);
@@ -857,6 +883,23 @@ public class GameScreen extends JPanel implements Runnable {
 
         spawnEnemies();
 
+        requestFocusInWindow();
+
+        if (gameThread == null || !gameThread.isAlive()) {
+            gameThread = new Thread(this);
+            gameThread.setDaemon(true);
+            gameThread.start();
+        }
+    }
+
+    public void startLoadedGame(SaveManager.GameSave save) {
+        navigatingToMenu = false;
+        progressSavedThisSession = true;
+
+        setSelectedCharacter(save.character);
+        resetRunState();
+        applyGameSave(save);
+        resumeExplorationMusic();
         requestFocusInWindow();
 
         if (gameThread == null || !gameThread.isAlive()) {
@@ -883,16 +926,23 @@ public class GameScreen extends JPanel implements Runnable {
         storyOpen = false;
         shopDialogueOpen = false;
         shopOpen = false;
+        wasNearShop = false;
         wensDialogueOpen = false;
         wensDialogueSeen = false;
         khaiDialogueOpen = false;
         khaiDialogueTriggered = new boolean[10];
         infoOpen = false;
+        inventoryOpen = false;
         settingsOpen = false;
+        unsavedMainMenuPromptOpen = false;
+        saveFeedback = "";
+        saveFeedbackTimer = 0;
         inBattle = false;
         postBattleCooldown = 0;
         lastPlayerLevel = -1;
         bossSpawned = false;
+        puzzlePieceCount = 0;
+        puzzlePieceCollected = new boolean[4];
         enemies.clear();
 
         mapBackground.loadMap("tiles/world1/EnhanceMap1.png");
@@ -918,9 +968,120 @@ public class GameScreen extends JPanel implements Runnable {
 
     /** Called by the HUD button — sets the flag BEFORE stopping so onBattleEnd ignores it. */
     public void goToMainMenu() {
+        if (!progressSavedThisSession) {
+            unsavedMainMenuPromptOpen = true;
+            clearMovementInput();
+            repaint();
+            return;
+        }
+        proceedToMainMenu();
+    }
+
+    private void proceedToMainMenu() {
+        unsavedMainMenuPromptOpen = false;
         navigatingToMenu = true;
         stopGame();
         window.showMainMenu();
+    }
+
+    private void saveProgress() {
+        SaveManager.saveGameProgress(captureGameSave());
+        progressSavedThisSession = true;
+        saveFeedback = "Progress saved!";
+        saveFeedbackTimer = 120;
+    }
+
+    private SaveManager.GameSave captureGameSave() {
+        SaveManager.GameSave save = new SaveManager.GameSave();
+        save.name = window.getPlayerName();
+        save.character = selectedCharacter;
+        save.level = playerCharacter != null ? playerCharacter.getLevel() : 1;
+        save.monstersKilled = window.getMonstersKilled();
+        save.world = currentWorld;
+        save.inDungeon = dungeonManager != null && dungeonManager.isInDungeon();
+        save.dungeon = save.inDungeon ? dungeonManager.getCurrentDungeon() : 0;
+        save.playerX = player != null ? player.x : 0;
+        save.playerY = player != null ? player.y : 0;
+
+        if (playerCharacter != null) {
+            save.hp = playerCharacter.getHp();
+            save.defense = playerCharacter.getDefense();
+            save.currentXp = playerCharacter.getCurrentXp();
+            save.gold = playerCharacter.getGold();
+            save.healthPotion = playerCharacter.getHealthPotion();
+            save.expPotion = playerCharacter.getExpPotion();
+        }
+
+        save.puzzlePieceCount = puzzlePieceCount;
+        System.arraycopy(puzzlePieceCollected, 0, save.puzzlePieces, 0, Math.min(puzzlePieceCollected.length, save.puzzlePieces.length));
+        System.arraycopy(storyTriggered, 0, save.storyTriggered, 0, Math.min(storyTriggered.length, save.storyTriggered.length));
+        System.arraycopy(khaiDialogueTriggered, 0, save.khaiDialogueTriggered, 0, Math.min(khaiDialogueTriggered.length, save.khaiDialogueTriggered.length));
+        return save;
+    }
+
+    private void applyGameSave(SaveManager.GameSave save) {
+        if (save == null || player == null || playerCharacter == null) return;
+
+        currentWorld = Math.max(1, Math.min(3, save.world));
+        loadCurrentWorldMap();
+
+        if (save.inDungeon && save.dungeon > 0) {
+            DungeonData dungeon = dungeonManager.getDungeon(currentWorld, save.dungeon);
+            if (dungeon != null) {
+                inDungeon = true;
+                dungeonManager.enterDungeon(save.dungeon);
+                mapBackground.loadMap(dungeon.mapPath);
+                collisionManager = new CollisionManager(dungeon.collisionPath);
+                worldWidth = mapBackground.worldWidth;
+                worldHeight = mapBackground.worldHeight;
+                camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
+            }
+        }
+
+        player.x = save.playerX;
+        player.y = save.playerY;
+        camera.update(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
+
+        playerCharacter.setLevel(Math.max(1, save.level));
+        playerCharacter.setHp(save.hp <= 0 ? playerCharacter.getMaxHp() : save.hp);
+        playerCharacter.setDefense(save.defense <= 0 ? playerCharacter.getMaxDefense() : save.defense);
+        playerCharacter.setCurrentXp(save.currentXp);
+        playerCharacter.setGold(save.gold);
+        playerCharacter.setHealthPotion(save.healthPotion);
+        playerCharacter.setExpPotion(save.expPotion);
+        window.setMonstersKilled(save.monstersKilled);
+
+        puzzlePieceCount = Math.max(0, Math.min(4, save.puzzlePieceCount));
+        System.arraycopy(save.puzzlePieces, 0, puzzlePieceCollected, 0, Math.min(save.puzzlePieces.length, puzzlePieceCollected.length));
+        System.arraycopy(save.storyTriggered, 0, storyTriggered, 0, Math.min(save.storyTriggered.length, storyTriggered.length));
+        System.arraycopy(save.khaiDialogueTriggered, 0, khaiDialogueTriggered, 0, Math.min(save.khaiDialogueTriggered.length, khaiDialogueTriggered.length));
+
+        lastPlayerLevel = playerCharacter.getLevel();
+        enemies.clear();
+        spawnEnemies();
+    }
+
+    private void loadCurrentWorldMap() {
+        inDungeon = false;
+        dungeonManager.exitDungeon();
+
+        if (currentWorld == 1) {
+            mapBackground.loadMap("tiles/world1/EnhanceMap1.png");
+            collisionManager = new CollisionManager("maps/EnhanceMap1_Collision.tmx");
+            playMusic(WORLD_1_MUSIC);
+        } else if (currentWorld == 2) {
+            mapBackground.loadMap("tiles/world2/World 2.png");
+            collisionManager = new CollisionManager("maps/World 2.tmx");
+            playMusic(WORLD_2_MUSIC);
+        } else {
+            mapBackground.loadMap("tiles/world3/World 3.png");
+            collisionManager = new CollisionManager("maps/World 3.tmx");
+            playMusic(WORLD_3_MUSIC);
+        }
+
+        worldWidth = mapBackground.worldWidth;
+        worldHeight = mapBackground.worldHeight;
+        camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, worldWidth, worldHeight);
     }
 
     private void spawnEnemies() {
@@ -1577,6 +1738,7 @@ public class GameScreen extends JPanel implements Runnable {
             blinkTimer = 0;
         }
         if (shopFeedbackTimer > 0) shopFeedbackTimer--;
+        if (saveFeedbackTimer > 0) saveFeedbackTimer--;
     }
 
     private boolean isCurrentDungeonPuzzleDungeon() {
@@ -1774,7 +1936,8 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     public boolean isDialogueOpen() {
-        return storyOpen || puzzlePiecePopupOpen || dungeonIntroPopupOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen || inventoryOpen;
+        return storyOpen || puzzlePiecePopupOpen || dungeonIntroPopupOpen || wensDialogueOpen || khaiDialogueOpen ||
+                shopDialogueOpen || inventoryOpen || unsavedMainMenuPromptOpen;
     }
 
     public boolean isInventoryOpen() {
@@ -1955,6 +2118,10 @@ public class GameScreen extends JPanel implements Runnable {
             drawGameSettings(g2);
         }
 
+        if (unsavedMainMenuPromptOpen) {
+            drawUnsavedMainMenuPrompt(g2);
+        }
+
         drawFadeTransition(g2);
 
         g2.dispose();
@@ -1986,6 +2153,41 @@ public class GameScreen extends JPanel implements Runnable {
 
         g2.setFont(new Font("Serif", Font.ITALIC, 12));
         g2.drawString("Click to continue", x + w - 140, y + h - 12);
+    }
+
+    private void drawUnsavedMainMenuPrompt(Graphics2D g2) {
+        int W = getWidth();
+        int H = getHeight();
+        g2.setColor(new Color(0, 0, 0, 175));
+        g2.fillRect(0, 0, W, H);
+
+        int panelW = 620;
+        int panelH = 220;
+        int panelX = (W - panelW) / 2;
+        int panelY = (H - panelH) / 2;
+
+        g2.setColor(new Color(18, 9, 5, 245));
+        g2.fillRect(panelX, panelY, panelW, panelH);
+        g2.setColor(GOLD_DARK);
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRect(panelX, panelY, panelW, panelH);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 24));
+        String title = "Progress hasn't been saved.";
+        FontMetrics fm = g2.getFontMetrics();
+        g2.setColor(GOLD_LIGHT);
+        g2.drawString(title, panelX + (panelW - fm.stringWidth(title)) / 2, panelY + 58);
+
+        g2.setFont(new Font("Serif", Font.PLAIN, 18));
+        String msg = "Would you like to save your progress?";
+        fm = g2.getFontMetrics();
+        g2.setColor(TEXT_COLOR());
+        g2.drawString(msg, panelX + (panelW - fm.stringWidth(msg)) / 2, panelY + 94);
+
+        unsavedSaveBtn = new Rectangle(panelX + 120, panelY + 135, 160, 46);
+        unsavedDiscardBtn = new Rectangle(panelX + panelW - 280, panelY + 135, 160, 46);
+        drawHudButton(g2, unsavedSaveBtn, "YES", false);
+        drawHudButton(g2, unsavedDiscardBtn, "NO", false);
     }
 
     private void drawPuzzlePiecePopup(Graphics2D g2) {
@@ -3244,7 +3446,7 @@ public class GameScreen extends JPanel implements Runnable {
         g2.fillRect(0, 0, W, H);
 
         int panelW = Math.min(560, W - 80);
-        int panelH = 330;
+        int panelH = 370;
         int panelX = (W - panelW) / 2;
         int panelY = (H - panelH) / 2;
 
@@ -3284,7 +3486,16 @@ public class GameScreen extends JPanel implements Runnable {
         int knobX = window.fullscreen ? gameFullscreenBtn.x + 38 : gameFullscreenBtn.x + 4;
         g2.fillOval(knobX, gameFullscreenBtn.y + 4, 20, 20);
 
+        if (saveFeedbackTimer > 0 && !saveFeedback.isEmpty()) {
+            g2.setFont(new Font("Serif", Font.BOLD, 14));
+            FontMetrics msgFm = g2.getFontMetrics();
+            g2.setColor(new Color(120, 230, 140));
+            g2.drawString(saveFeedback, panelX + (panelW - msgFm.stringWidth(saveFeedback)) / 2, panelY + panelH - 78);
+        }
+
+        gameSettingsSaveBtn = new Rectangle(panelX + 42, panelY + panelH - 58, 110, 36);
         gameSettingsCloseBtn = new Rectangle(panelX + panelW - 152, panelY + panelH - 58, 110, 36);
+        drawHudButton(g2, gameSettingsSaveBtn, "SAVE", false);
         drawHudButton(g2, gameSettingsCloseBtn, "CLOSE", false);
     }
 

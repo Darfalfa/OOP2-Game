@@ -61,6 +61,14 @@ abstract public class Character {
         recalcStats();
     }
 
+    public void setCurrentXp(int currentXp) {
+        this.currentXp = Math.max(0, Math.min(currentXp, nextLevelXp));
+    }
+
+    public void setGold(int gold) {
+        this.gold = Math.max(0, gold);
+    }
+
     //GETTERS
 
     public int getGold() {

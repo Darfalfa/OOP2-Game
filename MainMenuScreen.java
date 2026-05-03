@@ -4,6 +4,8 @@ import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 
@@ -28,8 +30,12 @@ public class MainMenuScreen extends JPanel {
 
     // Menu items
     private static final String[] LABELS = { "START GAME", "SETTINGS", "LEADERBOARD", "EXIT GAME" };
+    private enum MenuMode { MAIN, START_CHOICE, LOAD_GAME }
+    private MenuMode menuMode = MenuMode.MAIN;
+    private List<SaveManager.GameSave> loadSaves = new ArrayList<>();
+    private int loadScrollIndex = 0;
     private int hoveredIndex = -1;
-    private Rectangle[] buttonRects = new Rectangle[LABELS.length];
+    private Rectangle[] buttonRects = new Rectangle[12];
 
     public MainMenuScreen(GameWindow window) {
         this.window = window;
@@ -64,7 +70,8 @@ public class MainMenuScreen extends JPanel {
             public void mouseMoved(MouseEvent e) {
                 int prev = hoveredIndex;
                 hoveredIndex = -1;
-                for (int i = 0; i < buttonRects.length; i++) {
+                String[] labels = currentLabels();
+                for (int i = 0; i < labels.length; i++) {
                     if (buttonRects[i] != null && buttonRects[i].contains(e.getPoint())) {
                         hoveredIndex = i;
                         break;
@@ -80,7 +87,8 @@ public class MainMenuScreen extends JPanel {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                for (int i = 0; i < buttonRects.length; i++) {
+                String[] labels = currentLabels();
+                for (int i = 0; i < labels.length; i++) {
                     if (buttonRects[i] != null && buttonRects[i].contains(e.getPoint())) {
                         handleAction(i);
                         return;
@@ -88,15 +96,55 @@ public class MainMenuScreen extends JPanel {
                 }
             }
         });
+
+        addMouseWheelListener(e -> {
+            if (menuMode != MenuMode.LOAD_GAME || loadSaves.size() <= 2) return;
+            int maxScroll = Math.max(0, loadSaves.size() - 2);
+            loadScrollIndex = Math.max(0, Math.min(maxScroll, loadScrollIndex + e.getWheelRotation()));
+            hoveredIndex = -1;
+            repaint();
+        });
     }
 
     private void handleAction(int index) {
+        if (menuMode == MenuMode.START_CHOICE) {
+            if (index == 0) {
+                loadSaves = SaveManager.loadGameSaves();
+                menuMode = MenuMode.LOAD_GAME;
+                loadScrollIndex = 0;
+                hoveredIndex = -1;
+                repaint();
+            } else if (index == 1) {
+                window.setPlayerName("");
+                window.showNameEntry();
+            } else if (index == 2) {
+                menuMode = MenuMode.MAIN;
+                repaint();
+            }
+            return;
+        }
+
+        if (menuMode == MenuMode.LOAD_GAME) {
+            int visibleSaves = Math.min(2, loadSaves.size() - loadScrollIndex);
+            if (index < visibleSaves) {
+                window.loadGame(loadSaves.get(loadScrollIndex + index));
+            } else {
+                menuMode = MenuMode.START_CHOICE;
+                repaint();
+            }
+            return;
+        }
+
         switch (index) {
             case 0 -> {
-                if (window.getPlayerName().trim().isEmpty()) {
+                loadSaves = SaveManager.loadGameSaves();
+                if (loadSaves.isEmpty()) {
+                    window.setPlayerName("");
                     window.showNameEntry();
                 } else {
-                    window.showCharacterSelect();
+                    menuMode = MenuMode.START_CHOICE;
+                    hoveredIndex = -1;
+                    repaint();
                 }
             }
 
@@ -253,15 +301,56 @@ public class MainMenuScreen extends JPanel {
     private void drawMenuButtons(Graphics2D g2, int W, int H) {
         int btnW = 500, btnH = 56;
         int gap = 14;
-        int totalH = LABELS.length * btnH + (LABELS.length - 1) * gap;
-        int startY = Math.min((int)(H * 0.67), H - totalH - 32);
+        String[] labels = currentLabels();
+        if (buttonRects.length < labels.length) {
+            buttonRects = new Rectangle[labels.length];
+        }
+        int totalH = labels.length * btnH + (labels.length - 1) * gap;
+        int startY = menuMode == MenuMode.LOAD_GAME
+                ? Math.min((int)(H * 0.42), H - totalH - 44)
+                : Math.min((int)(H * 0.67), H - totalH - 32);
 
-        for (int i = 0; i < LABELS.length; i++) {
+        if (menuMode != MenuMode.MAIN) {
+            g2.setFont(new Font("Serif", Font.BOLD, 26));
+            String title = menuMode == MenuMode.START_CHOICE ? "SELECT GAME MODE" : "LOAD GAME";
+            FontMetrics fm = g2.getFontMetrics();
+            g2.setColor(GOLD_LIGHT);
+            g2.drawString(title, (W - fm.stringWidth(title)) / 2, startY - 24);
+        }
+
+        for (int i = 0; i < labels.length; i++) {
             int bx = (W - btnW) / 2;
             int by = startY + i * (btnH + gap);
             buttonRects[i] = new Rectangle(bx, by, btnW, btnH);
-            drawButton(g2, LABELS[i], bx, by, btnW, btnH, hoveredIndex == i, i);
+            drawButton(g2, labels[i], bx, by, btnW, btnH, hoveredIndex == i, i);
         }
+        if (menuMode == MenuMode.LOAD_GAME && loadSaves.size() > 2) {
+            g2.setFont(new Font("Serif", Font.ITALIC, 14));
+            String hint = "Scroll to view more saves";
+            FontMetrics fm = g2.getFontMetrics();
+            g2.setColor(new Color(230, 190, 95));
+            g2.drawString(hint, (W - fm.stringWidth(hint)) / 2, startY + totalH + 24);
+        }
+        for (int i = labels.length; i < buttonRects.length; i++) {
+            buttonRects[i] = null;
+        }
+    }
+
+    private String[] currentLabels() {
+        if (menuMode == MenuMode.START_CHOICE) {
+            return new String[]{"LOAD GAME", "NEW GAME", "BACK"};
+        }
+        if (menuMode == MenuMode.LOAD_GAME) {
+            int visibleSaves = Math.min(2, Math.max(0, loadSaves.size() - loadScrollIndex));
+            String[] labels = new String[visibleSaves + 1];
+            for (int i = 0; i < visibleSaves; i++) {
+                SaveManager.GameSave save = loadSaves.get(loadScrollIndex + i);
+                labels[i] = save.name + "  -  " + save.character + "  LV " + save.level;
+            }
+            labels[labels.length - 1] = "BACK";
+            return labels;
+        }
+        return LABELS;
     }
 
     private void drawButton(Graphics2D g2, String label, int x, int y, int w, int h,

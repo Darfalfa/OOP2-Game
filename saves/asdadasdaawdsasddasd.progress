@@ -1,0 +1,22 @@
+#Great Ruins of Khai progress save
+#Mon May 04 05:27:30 PST 2026
+playerX=1068
+currentXp=0
+level=1
+hp=80
+monstersKilled=0
+puzzlePieces=false,false,false,false
+playerY=1026
+expPotion=0
+characterIntroShown=true
+dungeon=0
+gold=0
+healthPotion=0
+character=Jakara
+world=1
+khaiDialogueTriggered=false,false,false,false,false,false,false,false,false,false
+inDungeon=false
+defense=6
+puzzlePieceCount=0
+name=asdadasdaawdsasddasd
+storyTriggered=false,true,false,false,false,false,false,false,false,false,false

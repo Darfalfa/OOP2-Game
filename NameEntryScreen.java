@@ -73,6 +73,7 @@ public class NameEntryScreen extends JPanel {
         super.addNotify();
         SwingUtilities.invokeLater(() -> {
             nameField.setText(window.getPlayerName());
+            errorMessage = "";
             nameField.requestFocusInWindow();
         });
     }

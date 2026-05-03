@@ -102,6 +102,22 @@ public class GameWindow extends JFrame {
         SaveManager.savePlayer(playerName, selectedCharacter, level, monstersKilled);
     }
 
+    public void loadGame(SaveManager.GameSave save) {
+        if (save == null) return;
+
+        setPlayerName(save.name);
+        setMonstersKilled(save.monstersKilled);
+        setSelectedCharacter(save.character);
+
+        SoundManager.stopBgm();
+        cardLayout.show(root, SCREEN_LOADING);
+        loadingScreen.startLoading(() -> {
+            gameScreen.startLoadedGame(save);
+            cardLayout.show(root, SCREEN_GAME);
+            gameScreen.requestFocusInWindow();
+        });
+    }
+
     /**
      * Called by CharacterSelectScreen after a character is chosen.
      * Shows the loading screen first. startGame() will switch to SCREEN_GAME
