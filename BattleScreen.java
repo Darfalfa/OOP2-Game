@@ -5,6 +5,7 @@ import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -99,7 +100,7 @@ public class BattleScreen extends JPanel {
     private BufferedImage skillSpriteSheet;
     private int skillFrame = 0;
     private int skillFrameTick = 0;
-    private int skillFrameSpeed = 2;
+    private int skillFrameSpeed = 1;
     private int skillMaxFrames = 1;
     private int skillFrameWidth;
     private int skillFrameHeight;
@@ -136,6 +137,12 @@ public class BattleScreen extends JPanel {
     private BufferedImage ayaBattleSprite;
     private BufferedImage ronnixBattleSprite;
     private BufferedImage jakaraBattleSprite;
+    private BufferedImage[] ayaIdleFrames = new BufferedImage[0];
+    private BufferedImage[] ronnixIdleFrames = new BufferedImage[0];
+    private BufferedImage[] jakaraIdleFrames = new BufferedImage[0];
+    private int playerIdleFrame = 0;
+    private int playerIdleFrameTick = 0;
+    private int playerIdleFrameSpeed = 1;
     private BufferedImage wensSprite;
 
     //companion-battle
@@ -195,6 +202,12 @@ public class BattleScreen extends JPanel {
                 enemyFrame =
                         (enemyFrame + 1) % enemyMaxFrames;
 
+            }
+
+            playerIdleFrameTick++;
+            if (playerIdleFrameTick >= playerIdleFrameSpeed) {
+                playerIdleFrameTick = 0;
+                playerIdleFrame++;
             }
 
             animTick++;
@@ -258,6 +271,9 @@ public class BattleScreen extends JPanel {
         ayaBattleSprite    = tryLoadImage("images/aya/ayaBattle.png");
         ronnixBattleSprite = tryLoadImage("images/ronnix/ronnixBattle.png");
         jakaraBattleSprite = tryLoadImage("images/jakara/jakaraBattle.png");
+        ayaIdleFrames = loadIdleFrames("images/aya/Idle");
+        ronnixIdleFrames = loadIdleFrames("images/ronnix/Idle");
+        jakaraIdleFrames = loadIdleFrames("images/jakara/Idle");
         wensSprite = tryLoadImage("images/Wens.png");
 
         String[] skillSheets = {
@@ -286,6 +302,25 @@ public class BattleScreen extends JPanel {
         }
     }
 
+    private BufferedImage[] loadIdleFrames(String folderPath) {
+        File folder = new File(folderPath);
+        File[] files = folder.listFiles((dir, name) -> name.toLowerCase().endsWith(".png"));
+        if (files == null || files.length == 0) {
+            return new BufferedImage[0];
+        }
+
+        Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        BufferedImage[] frames = new BufferedImage[files.length];
+        for (int i = 0; i < files.length; i++) {
+            try {
+                frames[i] = ImageIO.read(files[i]);
+            } catch (Exception e) {
+                frames[i] = null;
+            }
+        }
+        return frames;
+    }
+
     /** Returns the loaded BufferedImage, or null if the file is missing. */
     private BufferedImage tryLoadImage(String path) {
         if (imageCache.containsKey(path)) {
@@ -307,9 +342,27 @@ public class BattleScreen extends JPanel {
 
     /** Returns the correct battle sprite for the currently selected character. */
     private BufferedImage currentPlayerSprite() {
+        BufferedImage idle = currentPlayerIdleFrame();
+        if (idle != null) return idle;
         if ("Ronnix".equalsIgnoreCase(selectedCharacter)) return ronnixBattleSprite;
         if ("Jakara".equalsIgnoreCase(selectedCharacter)) return jakaraBattleSprite;
         return ayaBattleSprite; // default: Aya / Archer
+    }
+
+    private BufferedImage currentPlayerIdleFrame() {
+        BufferedImage[] frames;
+        if ("Ronnix".equalsIgnoreCase(selectedCharacter)) {
+            frames = ronnixIdleFrames;
+        } else if ("Jakara".equalsIgnoreCase(selectedCharacter)) {
+            frames = jakaraIdleFrames;
+        } else {
+            frames = ayaIdleFrames;
+        }
+
+        if (frames == null || frames.length == 0) {
+            return null;
+        }
+        return frames[playerIdleFrame % frames.length];
     }
 
     public void setSelectedCharacter(String name) {
@@ -378,6 +431,8 @@ public class BattleScreen extends JPanel {
         this.skillFrameHeight = 0;
         this.activeSkillNumber = 0;
         this.skillOnEnemy = false;
+        this.playerIdleFrame = 0;
+        this.playerIdleFrameTick = 0;
         this.cachedBattleSprite = null;
         this.cachedCleanedBattleSprite = null;
         this.frozenEnemyX = 0;
@@ -745,7 +800,10 @@ public class BattleScreen extends JPanel {
     private void enemyTurn() {
         int skillNum = chooseAvailableEnemySkill();
 
-        String sfx = enemyCharacter.getSkillSfx(skillNum);
+        String sfx = getMonsterAttackSfx();
+        if (sfx == null) {
+            sfx = enemyCharacter.getSkillSfx(skillNum);
+        }
         if (sfx != null) {
             SoundManager.playSfx(sfx);
         }
@@ -819,6 +877,21 @@ public class BattleScreen extends JPanel {
 
         healDelay.setRepeats(false);
         healDelay.start();
+    }
+
+    private String getMonsterAttackSfx() {
+        if (enemyCharacter == null) return null;
+
+        String spritePath = enemyCharacter.getSpritePath();
+        if (spritePath == null) return null;
+
+        if (spritePath.contains("ShadowSpriteLv2")) return "W1_M2.wav";
+        if (spritePath.contains("ShadowSprite")) return "W1_M1.wav";
+        if (spritePath.contains("ArmoredGhostSpriteLv2")) return "W2_M2.wav";
+        if (spritePath.contains("ArmoredGhostSprite")) return "W2_M1.wav";
+        if (spritePath.contains("CultistSpriteLv2")) return "W3_M2.wav";
+        if (spritePath.contains("CultistSprite")) return "W3_M1.wav";
+        return null;
     }
 
     private int chooseAvailableEnemySkill() {
@@ -1301,6 +1374,12 @@ public class BattleScreen extends JPanel {
             btnRects[i] = new Rectangle(bx, btnY, btnW, btnH);
             boolean hov = (hoveredBtn == i && !locked);
             drawButton(g2, ACTIONS[i], bx, btnY, btnW, btnH, hov, locked);
+            if (i < 3) {
+                int cooldown = playerCharacter.getSkillCooldown(i + 1);
+                if (cooldown > 0) {
+                    drawCooldownOverlay(g2, bx, btnY, btnW, btnH, cooldown);
+                }
+            }
         }
 
         String turnStr = locked
@@ -1368,6 +1447,24 @@ public class BattleScreen extends JPanel {
     }
 
     // ── Battle log ────────────────────────────────────────────────────────────
+    private void drawCooldownOverlay(Graphics2D g2, int x, int y, int w, int h, int cooldown) {
+        g2.setColor(new Color(0, 0, 0, 150));
+        g2.fillRoundRect(x, y, w, h, 8, 8);
+        g2.setColor(new Color(220, 70, 70, 210));
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(x + 2, y + 2, w - 4, h - 4, 8, 8);
+
+        String text = String.valueOf(cooldown);
+        g2.setFont(new Font("Serif", Font.BOLD, 34));
+        FontMetrics fm = g2.getFontMetrics();
+        int tx = x + (w - fm.stringWidth(text)) / 2;
+        int ty = y + (h + fm.getAscent() - fm.getDescent()) / 2;
+        g2.setColor(new Color(0, 0, 0, 190));
+        g2.drawString(text, tx + 2, ty + 2);
+        g2.setColor(new Color(255, 230, 210));
+        g2.drawString(text, tx, ty);
+    }
+
     private void drawBattleLog(Graphics2D g2, int W, int H) {
         int logW = W - 80, logH = 110;
         int logX = 40, logY = H - 90 - logH - 16;

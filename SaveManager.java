@@ -15,11 +15,13 @@ public class SaveManager {
 
     public static class SaveRecord {
         public String name;
+        public String character;
         public int level;
         public int monstersKilled;
 
-        public SaveRecord(String name, int level, int monstersKilled) {
+        public SaveRecord(String name, String character, int level, int monstersKilled) {
             this.name = name;
+            this.character = cleanCharacter(character);
             this.level = level;
             this.monstersKilled = monstersKilled;
         }
@@ -56,17 +58,26 @@ public class SaveManager {
                 return record;
             }
         }
-        return new SaveRecord(cleanName, 1, 0);
+        return new SaveRecord(cleanName, "Unknown", 1, 0);
     }
 
     public static void savePlayer(String name, int level, int monstersKilled) {
+        SaveRecord existing = loadPlayer(name);
+        savePlayer(name, existing.character, level, monstersKilled);
+    }
+
+    public static void savePlayer(String name, String character, int level, int monstersKilled) {
         String cleanName = cleanName(name);
+        String cleanCharacter = cleanCharacter(character);
         List<SaveRecord> records = loadLeaderboard();
         boolean updated = false;
 
         for (SaveRecord record : records) {
             if (record.name.equalsIgnoreCase(cleanName)) {
                 record.name = cleanName;
+                if (!"Unknown".equalsIgnoreCase(cleanCharacter)) {
+                    record.character = cleanCharacter;
+                }
                 record.level = Math.max(record.level, level);
                 record.monstersKilled = Math.max(record.monstersKilled, monstersKilled);
                 updated = true;
@@ -75,10 +86,20 @@ public class SaveManager {
         }
 
         if (!updated) {
-            records.add(new SaveRecord(cleanName, level, monstersKilled));
+            records.add(new SaveRecord(cleanName, cleanCharacter, level, monstersKilled));
         }
 
         writeLeaderboard(records);
+    }
+
+    public static boolean nameExists(String name) {
+        String cleanName = cleanName(name);
+        for (SaveRecord record : loadLeaderboard()) {
+            if (record.name.equalsIgnoreCase(cleanName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static String cleanName(String name) {
@@ -89,15 +110,28 @@ public class SaveManager {
         return clean.replace("|", "").replace("\n", " ").replace("\r", " ");
     }
 
+    public static String cleanCharacter(String character) {
+        String clean = character == null ? "" : character.trim();
+        if (clean.isEmpty()) {
+            clean = "Unknown";
+        }
+        return clean.replace("|", "").replace("\n", " ").replace("\r", " ");
+    }
+
     private static SaveRecord parseRecord(String line) {
         String[] parts = line.split("\\|");
-        if (parts.length != 3) return null;
 
         try {
-            return new SaveRecord(parts[0], Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+            if (parts.length == 4) {
+                return new SaveRecord(parts[0], parts[1], Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
+            }
+            if (parts.length == 3) {
+                return new SaveRecord(parts[0], "Unknown", Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+            }
         } catch (NumberFormatException e) {
             return null;
         }
+        return null;
     }
 
     private static void writeLeaderboard(List<SaveRecord> records) {
@@ -105,7 +139,7 @@ public class SaveManager {
 
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(LEADERBOARD_FILE, false))) {
             for (SaveRecord record : records) {
-                bw.write(record.name + "|" + record.level + "|" + record.monstersKilled);
+                bw.write(record.name + "|" + cleanCharacter(record.character) + "|" + record.level + "|" + record.monstersKilled);
                 bw.newLine();
             }
         } catch (IOException e) {

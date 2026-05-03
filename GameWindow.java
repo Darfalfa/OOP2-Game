@@ -99,7 +99,7 @@ public class GameWindow extends JFrame {
 
     public void recordMonsterKill(int level) {
         monstersKilled++;
-        SaveManager.savePlayer(playerName, level, monstersKilled);
+        SaveManager.savePlayer(playerName, selectedCharacter, level, monstersKilled);
     }
 
     /**

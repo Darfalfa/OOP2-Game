@@ -8,6 +8,7 @@ import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.Arrays;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 
@@ -53,7 +54,10 @@ public class CharacterSelectScreen extends JPanel {
 
     private final BufferedImage[] portraits = new BufferedImage[3];
     private final BufferedImage[] previews = new BufferedImage[3];
+    private final BufferedImage[][] idleFrames = new BufferedImage[3][];
     private final Rectangle[] characterRects = new Rectangle[3];
+    private Timer idleTimer;
+    private int idleFrameIndex = 0;
 
     private Rectangle playRect;
     private Rectangle backRect;
@@ -67,6 +71,11 @@ public class CharacterSelectScreen extends JPanel {
         setBackground(Color.BLACK);
         loadImages();
         setupListeners();
+        idleTimer = new Timer(110, e -> {
+            idleFrameIndex++;
+            repaint();
+        });
+        idleTimer.start();
     }
 
     private void loadImages() {
@@ -76,7 +85,27 @@ public class CharacterSelectScreen extends JPanel {
             if (previews[i] == null) {
                 previews[i] = loadPrepared(PORTRAIT_PATHS[i], 330, 430, false);
             }
+            idleFrames[i] = loadIdleFrames("images/" + NAMES[i].toLowerCase() + "/Idle");
         }
+    }
+
+    private BufferedImage[] loadIdleFrames(String folderPath) {
+        File folder = new File(folderPath);
+        File[] files = folder.listFiles((dir, name) -> name.toLowerCase().endsWith(".png"));
+        if (files == null || files.length == 0) {
+            return new BufferedImage[0];
+        }
+
+        Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        BufferedImage[] frames = new BufferedImage[files.length];
+        for (int i = 0; i < files.length; i++) {
+            try {
+                frames[i] = ImageIO.read(files[i]);
+            } catch (Exception e) {
+                frames[i] = null;
+            }
+        }
+        return frames;
     }
 
     private void setupListeners() {
@@ -121,6 +150,7 @@ public class CharacterSelectScreen extends JPanel {
 
                 if (playRect != null && playRect.contains(e.getPoint())) {
                     window.setSelectedCharacter(NAMES[selectedIndex]);
+                    SaveManager.savePlayer(window.getPlayerName(), NAMES[selectedIndex], 1, 0);
                     window.showGame();
                     return;
                 }
@@ -229,7 +259,10 @@ public class CharacterSelectScreen extends JPanel {
 
         drawPlatform(g2, platformX, platformY, platformW, platformH, accent);
 
-        BufferedImage img = previews[selectedIndex];
+        BufferedImage img = currentIdleFrame(selectedIndex);
+        if (img == null) {
+            img = previews[selectedIndex];
+        }
         if (img != null) {
             int imgW = Math.min(w, 360);
             int imgH = Math.min(430, platformY - y + 74);
@@ -297,7 +330,10 @@ public class CharacterSelectScreen extends JPanel {
         g2.setStroke(new BasicStroke(selected ? 4f : 2f));
         g2.drawRoundRect(r.x, r.y, r.width, r.height, arc, arc);
 
-        BufferedImage portrait = portraits[idx];
+        BufferedImage portrait = currentIdleFrame(idx);
+        if (portrait == null) {
+            portrait = portraits[idx];
+        }
         if (portrait != null) {
             int pad = 12;
             Shape oldClip = g2.getClip();
@@ -314,6 +350,14 @@ public class CharacterSelectScreen extends JPanel {
         g2.drawString(DISPLAY_NAMES[idx], tx + 2, ty + 2);
         g2.setColor(TEXT);
         g2.drawString(DISPLAY_NAMES[idx], tx, ty);
+    }
+
+    private BufferedImage currentIdleFrame(int idx) {
+        BufferedImage[] frames = idleFrames[idx];
+        if (frames == null || frames.length == 0) {
+            return null;
+        }
+        return frames[idleFrameIndex % frames.length];
     }
 
     private void drawAbilityPanel(Graphics2D g2, int x, int y, int w, int h, int idx) {

@@ -21,7 +21,10 @@ public class KeyHandler implements KeyListener {
     public void keyPressed(KeyEvent e) {
         int code = e.getKeyCode();
 
-        if (gameScreen.isDialogueOpen() || gameScreen.isSettingsOpen()) {
+        gameScreen.handleShopInput(code);
+        gameScreen.handleInfoInput(code);
+
+        if (gameScreen.isDialogueOpen() || gameScreen.isSettingsOpen() || gameScreen.isInventoryOpen()) {
             upPressed = false;
             downPressed = false;
             leftPressed = false;
@@ -39,13 +42,6 @@ public class KeyHandler implements KeyListener {
             gameScreen.toggleCollisionDebug();
         }
 
-        gameScreen.handleShopInput(code);
-
-        if (code == KeyEvent.VK_E) {
-            gameScreen.openShopDialogue();
-        }
-
-        gameScreen.handleInfoInput(code);
     }
 
     @Override

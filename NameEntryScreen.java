@@ -11,6 +11,7 @@ public class NameEntryScreen extends JPanel {
     private Rectangle backRect;
     private boolean continueHovered;
     private boolean backHovered;
+    private String errorMessage = "";
 
     private static final Color GOLD = new Color(201, 150, 58);
     private static final Color GOLD_LIGHT = new Color(240, 192, 96);
@@ -78,10 +79,15 @@ public class NameEntryScreen extends JPanel {
 
     private void submitName() {
         String name = SaveManager.cleanName(nameField.getText());
+        if (SaveManager.nameExists(name)) {
+            errorMessage = "Name has been taken";
+            repaint();
+            return;
+        }
+
+        errorMessage = "";
         window.setPlayerName(name);
-        SaveManager.SaveRecord record = SaveManager.loadPlayer(name);
-        window.setMonstersKilled(record.monstersKilled);
-        SaveManager.savePlayer(name, Math.max(1, record.level), record.monstersKilled);
+        window.setMonstersKilled(0);
         window.showCharacterSelect();
     }
 
@@ -133,6 +139,15 @@ public class NameEntryScreen extends JPanel {
         fm = g2.getFontMetrics();
         g2.setColor(TEXT);
         g2.drawString(hint, (W - fm.stringWidth(hint)) / 2, 272);
+
+        if (!errorMessage.isEmpty()) {
+            g2.setFont(new Font("Serif", Font.BOLD, 18));
+            fm = g2.getFontMetrics();
+            g2.setColor(new Color(0, 0, 0, 180));
+            g2.drawString(errorMessage, (W - fm.stringWidth(errorMessage)) / 2 + 2, 376);
+            g2.setColor(new Color(235, 90, 80));
+            g2.drawString(errorMessage, (W - fm.stringWidth(errorMessage)) / 2, 374);
+        }
 
         continueRect = new Rectangle(W / 2 - 210, 386, 420, 52);
         backRect = new Rectangle(W / 2 - 210, 456, 420, 52);

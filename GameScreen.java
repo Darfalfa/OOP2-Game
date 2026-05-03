@@ -118,6 +118,7 @@ public class GameScreen extends JPanel implements Runnable {
     private Rectangle nextLevelBtn;
 
     private boolean infoOpen = false;
+    private boolean inventoryOpen = false;
 
     private Rectangle buyHealthBtn = null;
     private Rectangle sellHealthBtn = null;
@@ -148,6 +149,7 @@ public class GameScreen extends JPanel implements Runnable {
     // SHOP SYSTEM
     private boolean shopDialogueOpen = false;
     private boolean shopOpen = false;
+    private boolean wasNearShop = false;
     private boolean makoBlink = false;
     private int blinkTimer = 0;
     private boolean wensDialogueOpen = false;
@@ -1368,6 +1370,11 @@ public class GameScreen extends JPanel implements Runnable {
             return;
         }
 
+        if (inventoryOpen) {
+            clearMovementInput();
+            return;
+        }
+
         if (postBattleCooldown > 0) {
             postBattleCooldown--;
         }
@@ -1383,7 +1390,7 @@ public class GameScreen extends JPanel implements Runnable {
             spawnEnemies();
 
             int lvl = playerCharacter.getLevel();
-            SaveManager.savePlayer(window.getPlayerName(), lvl, window.getMonstersKilled());
+            SaveManager.savePlayer(window.getPlayerName(), selectedCharacter, lvl, window.getMonstersKilled());
 
             if (lvl >= 10 && !endingChoiceOpen && !endingChosen) {
                 enemies.clear();
@@ -1433,6 +1440,14 @@ public class GameScreen extends JPanel implements Runnable {
         player.update();
         System.out.println("Player position: " + player.x + ", " + player.y);
         camera.update(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
+
+        boolean nearShop = isNearCurrentWorldShop();
+        if (nearShop && !wasNearShop && !shopOpen && !shopDialogueOpen &&
+                !storyOpen && !wensDialogueOpen && !khaiDialogueOpen && !inventoryOpen &&
+                !puzzlePiecePopupOpen && !dungeonIntroPopupOpen) {
+            openShopDialogue();
+        }
+        wasNearShop = nearShop;
 
         Rectangle playerBox = new Rectangle(
                 player.x,
@@ -1740,13 +1755,30 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     public void handleInfoInput(int keyCode) {
+        if (keyCode == KeyEvent.VK_E && !shopOpen && !shopDialogueOpen &&
+                !storyOpen && !wensDialogueOpen && !khaiDialogueOpen &&
+                !puzzlePiecePopupOpen && !dungeonIntroPopupOpen) {
+            inventoryOpen = !inventoryOpen;
+            infoOpen = false;
+            repaint();
+            return;
+        }
+
+        if (inventoryOpen) {
+            return;
+        }
+
         if (keyCode == KeyEvent.VK_I) {
             infoOpen = !infoOpen;
         }
     }
 
     public boolean isDialogueOpen() {
-        return storyOpen || puzzlePiecePopupOpen || dungeonIntroPopupOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen;
+        return storyOpen || puzzlePiecePopupOpen || dungeonIntroPopupOpen || wensDialogueOpen || khaiDialogueOpen || shopDialogueOpen || inventoryOpen;
+    }
+
+    public boolean isInventoryOpen() {
+        return inventoryOpen;
     }
 
     private void startFadeTransition(Runnable action) {
@@ -1897,6 +1929,10 @@ public class GameScreen extends JPanel implements Runnable {
 
         if (infoOpen) {
             drawInfoWindow(g2);
+        }
+
+        if (inventoryOpen) {
+            drawInventoryWindow(g2);
         }
 
         if (puzzlePiecePopupOpen) {
@@ -2779,6 +2815,98 @@ public class GameScreen extends JPanel implements Runnable {
         }
 
         return y - startY;
+    }
+
+    private void drawInventoryWindow(Graphics2D g2) {
+        if (playerCharacter == null) return;
+
+        int W = getWidth();
+        int H = getHeight();
+        g2.setColor(new Color(0, 0, 0, 145));
+        g2.fillRect(0, 0, W, H);
+
+        int panelW = 560;
+        int panelH = 360;
+        int panelX = (W - panelW) / 2;
+        int panelY = (H - panelH) / 2;
+
+        g2.setColor(new Color(18, 9, 5, 235));
+        g2.fillRoundRect(panelX, panelY, panelW, panelH, 14, 14);
+        g2.setColor(GOLD_DARK);
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(panelX, panelY, panelW, panelH, 14, 14);
+
+        int coinX = panelX + 18;
+        int coinY = panelY + 16;
+        if (coinImg != null) {
+            g2.drawImage(coinImg, coinX, coinY, 20, 20, null);
+        }
+        g2.setFont(new Font("Serif", Font.BOLD, 14));
+        g2.setColor(GOLD_LIGHT);
+        g2.drawString(String.valueOf(playerCharacter.getGold()), coinX + 28, coinY + 16);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 34));
+        FontMetrics fm = g2.getFontMetrics();
+        String title = "INVENTORY";
+        g2.drawString(title, panelX + (panelW - fm.stringWidth(title)) / 2, panelY + 58);
+
+        int cardY = panelY + 92;
+        int cardW = 150;
+        int cardH = 154;
+        int gap = 26;
+        int startX = panelX + (panelW - (cardW * 3 + gap * 2)) / 2;
+
+        drawInventoryCard(g2, startX, cardY, cardW, cardH, healthImg, "Health Potion", playerCharacter.getHealthPotion());
+        drawInventoryCard(g2, startX + cardW + gap, cardY, cardW, cardH, expImg, "EXP Potion", playerCharacter.getExpPotion());
+        drawInventoryCard(g2, startX + (cardW + gap) * 2, cardY, cardW, cardH, null, "Puzzle Pieces", puzzlePieceCount);
+
+        int pieceSize = 46;
+        int pieceGap = 12;
+        int piecesW = 4 * pieceSize + 3 * pieceGap;
+        int piecesX = panelX + (panelW - piecesW) / 2;
+        int piecesY = panelY + 270;
+        for (int i = 0; i < 4; i++) {
+            int x = piecesX + i * (pieceSize + pieceGap);
+            g2.setColor(puzzlePieceCollected[i] ? new Color(80, 45, 12, 230) : new Color(20, 14, 16, 220));
+            g2.fillRoundRect(x, piecesY, pieceSize, pieceSize, 8, 8);
+            g2.setColor(puzzlePieceCollected[i] ? GOLD_LIGHT : GOLD_DARK);
+            g2.drawRoundRect(x, piecesY, pieceSize, pieceSize, 8, 8);
+            if (puzzlePieceCollected[i] && puzzlePieceImages[i] != null) {
+                g2.drawImage(puzzlePieceImages[i], x + 5, piecesY + 5, pieceSize - 10, pieceSize - 10, null);
+            }
+        }
+
+        g2.setFont(new Font("Serif", Font.ITALIC, 12));
+        g2.setColor(new Color(170, 155, 125));
+        g2.drawString("Press E to close", panelX + panelW - 112, panelY + panelH - 16);
+    }
+
+    private void drawInventoryCard(Graphics2D g2, int x, int y, int w, int h, Image icon, String label, int count) {
+        g2.setColor(new Color(28, 14, 8, 235));
+        g2.fillRoundRect(x, y, w, h, 10, 10);
+        g2.setColor(GOLD_DARK);
+        g2.drawRoundRect(x, y, w, h, 10, 10);
+
+        if (icon != null) {
+            g2.drawImage(icon, x + (w - 72) / 2, y + 18, 72, 72, null);
+        } else {
+            g2.setFont(new Font("Serif", Font.BOLD, 46));
+            FontMetrics fm = g2.getFontMetrics();
+            String piece = String.valueOf(count);
+            g2.setColor(GOLD_LIGHT);
+            g2.drawString(piece, x + (w - fm.stringWidth(piece)) / 2, y + 72);
+        }
+
+        g2.setFont(new Font("Serif", Font.BOLD, 15));
+        FontMetrics fm = g2.getFontMetrics();
+        g2.setColor(TEXT_COLOR());
+        g2.drawString(label, x + (w - fm.stringWidth(label)) / 2, y + 112);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 22));
+        fm = g2.getFontMetrics();
+        String amount = "x" + count;
+        g2.setColor(GOLD_LIGHT);
+        g2.drawString(amount, x + (w - fm.stringWidth(amount)) / 2, y + 140);
     }
 
     private void drawInfoWindow(Graphics2D g2) {
