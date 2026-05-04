@@ -15,6 +15,18 @@ public class Camera {
         this.worldHeight  = worldHeight;
     }
 
+    public void setViewportSize(int screenWidth, int screenHeight) {
+        this.screenWidth = screenWidth;
+        this.screenHeight = screenHeight;
+        clampToWorld();
+    }
+
+    public void centerOn(int playerX, int playerY, int playerWidth, int playerHeight) {
+        x = playerX + playerWidth / 2.0 - screenWidth / 2.0;
+        y = playerY + playerHeight / 2.0 - screenHeight / 2.0;
+        clampToWorld();
+    }
+
     /**
      * Smoothly moves the camera so the player stays centred,
      * then clamps so we never show outside the world.
@@ -29,11 +41,17 @@ public class Camera {
         x += (targetX - x) * SMOOTHING;
         y += (targetY - y) * SMOOTHING;
 
-        // Clamp to world bounds
+        clampToWorld();
+    }
+
+    private void clampToWorld() {
         if (x < 0) x = 0;
         if (y < 0) y = 0;
         if (x > worldWidth  - screenWidth)  x = worldWidth  - screenWidth;
         if (y > worldHeight - screenHeight) y = worldHeight - screenHeight;
+
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
     }
 
     /** X offset to apply when drawing world objects */

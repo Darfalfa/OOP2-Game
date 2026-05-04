@@ -1,0 +1,21 @@
+#Great Ruins of Khai progress save
+#Mon May 04 15:05:06 PST 2026
+playerX=1080
+currentXp=0
+level=1
+hp=100
+monstersKilled=0
+puzzlePieces=false,false,false,false
+playerY=1044
+expPotion=0
+dungeon=0
+gold=0
+healthPotion=0
+character=Ronnix
+world=1
+khaiDialogueTriggered=false,false,false,false,false,false,false,false,false,false
+inDungeon=false
+defense=10
+puzzlePieceCount=0
+name=Player1
+storyTriggered=false,true,false,false,false,false,false,false,false,false,false

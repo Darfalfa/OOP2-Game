@@ -114,6 +114,9 @@ public class GameScreen extends JPanel implements Runnable {
     private Rectangle gameMusicTrack, gameSfxTrack, gameMusicSlider, gameSfxSlider;
     private Rectangle gameFullscreenBtn, gameSettingsCloseBtn, gameSettingsSaveBtn;
     private String gameSettingsDragging = null;
+    private int pendingGameMusicVol = 80;
+    private int pendingGameSfxVol = 70;
+    private boolean pendingGameFullscreen = false;
     private String saveFeedback = "";
     private int saveFeedbackTimer = 0;
     private boolean progressSavedThisSession = false;
@@ -227,6 +230,13 @@ public class GameScreen extends JPanel implements Runnable {
 
         camera = new Camera(SCREEN_WIDTH, SCREEN_HEIGHT, mapBackground.worldWidth, mapBackground.worldHeight);
 
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                refreshCameraViewport();
+            }
+        });
+
         try {
             shopBG = new ImageIcon("images/Shop_UI.png").getImage();
             makoChatboxImg = new ImageIcon("images/Mako_Dialogue_Box.png").getImage();
@@ -324,12 +334,10 @@ public class GameScreen extends JPanel implements Runnable {
             public void mouseDragged(MouseEvent e) {
                 if (!settingsOpen) return;
                 if ("music".equals(gameSettingsDragging) && gameMusicTrack != null) {
-                    window.musicVol = sliderValue(e.getX(), gameMusicTrack);
-                    SoundManager.setMusicVolume(window.musicVol / 100f);
+                    pendingGameMusicVol = sliderValue(e.getX(), gameMusicTrack);
                     repaint();
                 } else if ("sfx".equals(gameSettingsDragging) && gameSfxTrack != null) {
-                    window.sfxVol = sliderValue(e.getX(), gameSfxTrack);
-                    SoundManager.setSfxVolume(window.sfxVol / 100f);
+                    pendingGameSfxVol = sliderValue(e.getX(), gameSfxTrack);
                     repaint();
                 }
             }
@@ -367,13 +375,12 @@ public class GameScreen extends JPanel implements Runnable {
 
                 if (settingsOpen) {
                     if (gameFullscreenBtn != null && gameFullscreenBtn.contains(p)) {
-                        window.fullscreen = !window.fullscreen;
-                        window.setFullscreen(window.fullscreen);
+                        pendingGameFullscreen = !pendingGameFullscreen;
                         repaint();
                         return;
                     }
                     if (gameSettingsSaveBtn != null && gameSettingsSaveBtn.contains(p)) {
-                        saveProgress();
+                        applyGameSettings();
                         repaint();
                         return;
                     }
@@ -614,6 +621,9 @@ public class GameScreen extends JPanel implements Runnable {
     }
 
     private void openGameSettings() {
+        pendingGameMusicVol = window.musicVol;
+        pendingGameSfxVol = window.sfxVol;
+        pendingGameFullscreen = window.fullscreen;
         settingsOpen = true;
         clearMovementInput();
         requestFocusInWindow();
@@ -621,8 +631,39 @@ public class GameScreen extends JPanel implements Runnable {
 
     private void closeGameSettings() {
         settingsOpen = false;
+        gameSettingsDragging = null;
         clearMovementInput();
         requestFocusInWindow();
+    }
+
+    private void applyGameSettings() {
+        window.musicVol = pendingGameMusicVol;
+        window.sfxVol = pendingGameSfxVol;
+        SoundManager.setMusicVolume(window.musicVol / 100f);
+        SoundManager.setSfxVolume(window.sfxVol / 100f);
+
+        if (window.fullscreen != pendingGameFullscreen) {
+            window.fullscreen = pendingGameFullscreen;
+            window.setFullscreen(window.fullscreen);
+        }
+
+        refreshCameraViewport();
+        saveFeedback = "Settings applied!";
+        saveFeedbackTimer = 120;
+        clearMovementInput();
+        requestFocusInWindow();
+    }
+
+    private void refreshCameraViewport() {
+        if (camera == null) return;
+
+        int viewportW = getWidth() > 0 ? getWidth() : SCREEN_WIDTH;
+        int viewportH = getHeight() > 0 ? getHeight() : SCREEN_HEIGHT;
+        camera.setViewportSize(viewportW, viewportH);
+
+        if (player != null) {
+            camera.centerOn(player.x, player.y, Player.SPRITE_W, Player.SPRITE_H);
+        }
     }
 
     private void clearMovementInput() {
@@ -1562,6 +1603,7 @@ public class GameScreen extends JPanel implements Runnable {
 
         if (settingsOpen) {
             clearMovementInput();
+            if (saveFeedbackTimer > 0) saveFeedbackTimer--;
             return;
         }
 
@@ -3547,24 +3589,24 @@ public class GameScreen extends JPanel implements Runnable {
         int rowX = panelX + 42;
         int rowW = panelW - 84;
         int y = panelY + 100;
-        gameMusicTrack = drawGameSlider(g2, "MUSIC", window.musicVol, rowX, y, rowW);
-        gameMusicSlider = sliderKnob(gameMusicTrack, window.musicVol);
+        gameMusicTrack = drawGameSlider(g2, "MUSIC", pendingGameMusicVol, rowX, y, rowW);
+        gameMusicSlider = sliderKnob(gameMusicTrack, pendingGameMusicVol);
 
         y += 58;
 
-        gameSfxTrack = drawGameSlider(g2, "SFX", window.sfxVol, rowX, y, rowW);
-        gameSfxSlider = sliderKnob(gameSfxTrack, window.sfxVol);
+        gameSfxTrack = drawGameSlider(g2, "SFX", pendingGameSfxVol, rowX, y, rowW);
+        gameSfxSlider = sliderKnob(gameSfxTrack, pendingGameSfxVol);
 
         y += 64;
         g2.setFont(new Font("Serif", Font.BOLD, 16));
         g2.setColor(GOLD);
         g2.drawString("FULLSCREEN", rowX, y);
         gameFullscreenBtn = new Rectangle(rowX + 150, y - 22, 64, 28);
-        g2.setColor(window.fullscreen? new Color(82, 45, 12) : new Color(22, 12, 8));
+        g2.setColor(pendingGameFullscreen ? new Color(82, 45, 12) : new Color(22, 12, 8));
         g2.fillRoundRect(gameFullscreenBtn.x, gameFullscreenBtn.y, gameFullscreenBtn.width, gameFullscreenBtn.height, 28, 28);
-        g2.setColor(window.fullscreen ? GOLD_LIGHT : GOLD_DARK);
+        g2.setColor(pendingGameFullscreen ? GOLD_LIGHT : GOLD_DARK);
         g2.drawRoundRect(gameFullscreenBtn.x, gameFullscreenBtn.y, gameFullscreenBtn.width, gameFullscreenBtn.height, 28, 28);
-        int knobX = window.fullscreen ? gameFullscreenBtn.x + 38 : gameFullscreenBtn.x + 4;
+        int knobX = pendingGameFullscreen ? gameFullscreenBtn.x + 38 : gameFullscreenBtn.x + 4;
         g2.fillOval(knobX, gameFullscreenBtn.y + 4, 20, 20);
 
         if (saveFeedbackTimer > 0 && !saveFeedback.isEmpty()) {
@@ -3576,7 +3618,7 @@ public class GameScreen extends JPanel implements Runnable {
 
         gameSettingsSaveBtn = new Rectangle(panelX + 42, panelY + panelH - 58, 110, 36);
         gameSettingsCloseBtn = new Rectangle(panelX + panelW - 152, panelY + panelH - 58, 110, 36);
-        drawHudButton(g2, gameSettingsSaveBtn, "SAVE", false);
+        drawHudButton(g2, gameSettingsSaveBtn, "APPLY", false);
         drawHudButton(g2, gameSettingsCloseBtn, "CLOSE", false);
     }
 
