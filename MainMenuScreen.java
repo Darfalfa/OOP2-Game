@@ -307,7 +307,7 @@ public class MainMenuScreen extends JPanel {
         }
         int totalH = labels.length * btnH + (labels.length - 1) * gap;
         int startY = menuMode == MenuMode.LOAD_GAME
-                ? Math.min((int)(H * 0.42), H - totalH - 44)
+                ? Math.min((int)(H * 0.65), H - totalH - 44)
                 : Math.min((int)(H * 0.67), H - totalH - 32);
 
         if (menuMode != MenuMode.MAIN) {
