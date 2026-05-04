@@ -100,7 +100,7 @@ public class BattleScreen extends JPanel {
     private BufferedImage skillSpriteSheet;
     private int skillFrame = 0;
     private int skillFrameTick = 0;
-    private int skillFrameSpeed = 1;
+    private int skillFrameSpeed = 3;
     private int skillMaxFrames = 1;
     private int skillFrameWidth;
     private int skillFrameHeight;
@@ -142,7 +142,7 @@ public class BattleScreen extends JPanel {
     private BufferedImage[] jakaraIdleFrames = new BufferedImage[0];
     private int playerIdleFrame = 0;
     private int playerIdleFrameTick = 0;
-    private int playerIdleFrameSpeed = 1;
+    private int playerIdleFrameSpeed = 2;
     private BufferedImage wensSprite;
 
     //companion-battle
