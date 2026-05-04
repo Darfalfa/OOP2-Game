@@ -133,6 +133,7 @@ public class GameScreen extends JPanel implements Runnable {
     private Rectangle exitBtn;
     private Rectangle hoveredBtn = null;
     private Rectangle expPotionBtn;
+    private Rectangle inventoryExpUseBtn;
 
     // SHOP IMAGES
     private Image shopBG;
@@ -265,6 +266,16 @@ public class GameScreen extends JPanel implements Runnable {
                             (gameSettingsSaveBtn != null && gameSettingsSaveBtn.contains(p)) ||
                             (gameSettingsCloseBtn != null && gameSettingsCloseBtn.contains(p));
                     setCursor(overSettings ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
+                    return;
+                }
+
+                if (inventoryOpen) {
+                    Rectangle prevHov = hoveredBtn;
+                    hoveredBtn = inventoryExpUseBtn != null && inventoryExpUseBtn.contains(p) ? inventoryExpUseBtn : null;
+                    if (prevHov != hoveredBtn) repaint();
+                    setCursor(hoveredBtn != null
+                            ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                            : Cursor.getDefaultCursor());
                     return;
                 }
 
@@ -534,6 +545,13 @@ public class GameScreen extends JPanel implements Runnable {
                         hoveredBtn = null;
                     }
                     repaint();
+                }
+
+                if (inventoryOpen) {
+                    if (inventoryExpUseBtn != null && inventoryExpUseBtn.contains(p)) {
+                        useExpPotionFromInventory();
+                    }
+                    return;
                 }
 
                 // ── EXP Potion HUD button ─────────────────────────────────────
@@ -1055,6 +1073,7 @@ public class GameScreen extends JPanel implements Runnable {
         System.arraycopy(save.puzzlePieces, 0, puzzlePieceCollected, 0, Math.min(save.puzzlePieces.length, puzzlePieceCollected.length));
         System.arraycopy(save.storyTriggered, 0, storyTriggered, 0, Math.min(save.storyTriggered.length, storyTriggered.length));
         System.arraycopy(save.khaiDialogueTriggered, 0, khaiDialogueTriggered, 0, Math.min(save.khaiDialogueTriggered.length, khaiDialogueTriggered.length));
+        finalBossDefeated = storyTriggered.length > 10 && storyTriggered[10];
 
         lastPlayerLevel = playerCharacter.getLevel();
         enemies.clear();
@@ -1156,6 +1175,7 @@ public class GameScreen extends JPanel implements Runnable {
             String bossType = dungeonManager.getBossType(world, dungeonNum);
 
             if (bossType != null) {
+                if (isDungeonBossAlreadyDefeated(world, dungeonNum)) return;
                 if (world == 3 && dungeonNum == 3 && finalBossDefeated) return;
                 if (bossSpawned) return;
 
@@ -1179,6 +1199,7 @@ public class GameScreen extends JPanel implements Runnable {
         // Normal boss spawn
         String bossType = dungeonManager.getBossType(world, dungeonNum);
         if (bossType != null) {
+            if (isDungeonBossAlreadyDefeated(world, dungeonNum)) return;
             if (world == 3 && dungeonNum == 3 && finalBossDefeated) return;
             if (bossSpawned) return;
 
@@ -1312,6 +1333,12 @@ public class GameScreen extends JPanel implements Runnable {
                 (level == 9 && storyTriggered[10]);
     }
 
+    private boolean isDungeonBossAlreadyDefeated(int world, int dungeonNum) {
+        return (world == 1 && dungeonNum == 3 && puzzlePieceCollected[0]) ||
+                (world == 2 && dungeonNum == 3 && puzzlePieceCollected[2]) ||
+                (world == 3 && dungeonNum == 3 && finalBossDefeated);
+    }
+
     public void onBattleEnd(Enemy defeated, boolean won) {
         inBattle = false;
         postBattleCooldown = 120; // about 2 seconds
@@ -1335,6 +1362,13 @@ public class GameScreen extends JPanel implements Runnable {
                     if (dungeonManager.doesBossGivePuzzlePiece(world, dungeonNum)) {
                         awardPuzzlePiece(world, dungeonNum);
                     }
+                }
+
+                if (inDungeon &&
+                        ((currentWorld == 1 && dungeonManager.getCurrentDungeon() == 3) ||
+                                (currentWorld == 2 && dungeonManager.getCurrentDungeon() == 3))) {
+                    enemies.clear();
+                    bossSpawned = true;
                 }
 
                 if (defeated.character instanceof FinalBossLogic &&
@@ -1533,6 +1567,8 @@ public class GameScreen extends JPanel implements Runnable {
 
         if (inventoryOpen) {
             clearMovementInput();
+            if (shopFeedbackTimer > 0) shopFeedbackTimer--;
+            if (saveFeedbackTimer > 0) saveFeedbackTimer--;
             return;
         }
 
@@ -1817,6 +1853,22 @@ public class GameScreen extends JPanel implements Runnable {
     private void showShopFeedback(String msg) {
         shopFeedback = msg;
         shopFeedbackTimer = FEEDBACK_DURATION;
+    }
+
+    private void useExpPotionFromInventory() {
+        if (playerCharacter == null) return;
+
+        if (playerCharacter.getExpPotion() > 0) {
+            playerCharacter.useExpPotion();
+            showShopFeedback("EXP Potion used!");
+        } else {
+            showShopFeedback("No EXP potions!");
+        }
+
+        progressSavedThisSession = false;
+        clearMovementInput();
+        requestFocusInWindow();
+        repaint();
     }
 
     private Point getCurrentShopPoint() {
@@ -3028,7 +3080,7 @@ public class GameScreen extends JPanel implements Runnable {
         g2.fillRect(0, 0, W, H);
 
         int panelW = 560;
-        int panelH = 360;
+        int panelH = 390;
         int panelX = (W - panelW) / 2;
         int panelY = (H - panelH) / 2;
 
@@ -3057,16 +3109,26 @@ public class GameScreen extends JPanel implements Runnable {
         int cardH = 154;
         int gap = 26;
         int startX = panelX + (panelW - (cardW * 3 + gap * 2)) / 2;
+        inventoryExpUseBtn = null;
 
         drawInventoryCard(g2, startX, cardY, cardW, cardH, healthImg, "Health Potion", playerCharacter.getHealthPotion());
         drawInventoryCard(g2, startX + cardW + gap, cardY, cardW, cardH, expImg, "EXP Potion", playerCharacter.getExpPotion());
+        inventoryExpUseBtn = new Rectangle(startX + cardW + gap + 35, cardY + cardH + 8, 80, 28);
+        drawInventoryUseButton(g2, inventoryExpUseBtn, playerCharacter.getExpPotion() > 0);
         drawInventoryCard(g2, startX + (cardW + gap) * 2, cardY, cardW, cardH, null, "Puzzle Pieces", puzzlePieceCount);
+
+        if (shopFeedbackTimer > 0 && !shopFeedback.isEmpty()) {
+            g2.setFont(new Font("Serif", Font.BOLD, 14));
+            FontMetrics msgFm = g2.getFontMetrics();
+            g2.setColor(shopFeedback.startsWith("No ") ? new Color(230, 100, 90) : new Color(120, 230, 140));
+            g2.drawString(shopFeedback, panelX + (panelW - msgFm.stringWidth(shopFeedback)) / 2, panelY + 286);
+        }
 
         int pieceSize = 46;
         int pieceGap = 12;
         int piecesW = 4 * pieceSize + 3 * pieceGap;
         int piecesX = panelX + (panelW - piecesW) / 2;
-        int piecesY = panelY + 270;
+        int piecesY = panelY + 298;
         for (int i = 0; i < 4; i++) {
             int x = piecesX + i * (pieceSize + pieceGap);
             g2.setColor(puzzlePieceCollected[i] ? new Color(80, 45, 12, 230) : new Color(20, 14, 16, 220));
@@ -3081,6 +3143,25 @@ public class GameScreen extends JPanel implements Runnable {
         g2.setFont(new Font("Serif", Font.ITALIC, 12));
         g2.setColor(new Color(170, 155, 125));
         g2.drawString("Press E to close", panelX + panelW - 112, panelY + panelH - 16);
+    }
+
+    private void drawInventoryUseButton(Graphics2D g2, Rectangle rect, boolean enabled) {
+        boolean hovered = enabled && hoveredBtn != null && hoveredBtn.equals(rect);
+
+        g2.setColor(enabled
+                ? (hovered ? new Color(92, 54, 18, 240) : new Color(62, 34, 12, 235))
+                : new Color(45, 35, 32, 210));
+        g2.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 8, 8);
+        g2.setColor(enabled ? GOLD_LIGHT : GOLD_DARK);
+        g2.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 8, 8);
+
+        g2.setFont(new Font("Serif", Font.BOLD, 14));
+        FontMetrics fm = g2.getFontMetrics();
+        String text = "USE";
+        int tx = rect.x + (rect.width - fm.stringWidth(text)) / 2;
+        int ty = rect.y + (rect.height + fm.getAscent() - fm.getDescent()) / 2;
+        g2.setColor(enabled ? Color.WHITE : new Color(150, 140, 125));
+        g2.drawString(text, tx, ty);
     }
 
     private void drawInventoryCard(Graphics2D g2, int x, int y, int w, int h, Image icon, String label, int count) {
