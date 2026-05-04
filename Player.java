@@ -399,11 +399,6 @@ public abstract class Player {
         int b = argb & 0xFF;
 
         boolean transparent = a <= 8;
-        if (transparentEdge) {
-            if (transparent) queue.add(new int[]{x, y});
-            return;
-        }
-
         boolean nearWhite = r > 190 && g > 190 && b > 190
                 && Math.abs(r - g) < 45
                 && Math.abs(r - b) < 45
