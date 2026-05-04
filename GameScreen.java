@@ -197,6 +197,8 @@ public class GameScreen extends JPanel implements Runnable {
     private static final Point WORLD_1_SHOP = new Point(1809, 1800);
     private static final Point WORLD_2_SHOP = new Point(2305, 1045);
     private static final Point WORLD_3_SHOP = new Point(2161, 1226);
+    private static final int SHOP_DESIGN_W = 1280;
+    private static final int SHOP_DESIGN_H = 720;
 
     // Adjust these two values to make the fade transition faster or slower.
     private static final int FADE_STEP_MS = 16;
@@ -2894,25 +2896,44 @@ public class GameScreen extends JPanel implements Runnable {
         if (!line.isEmpty()) g2.drawString(line.trim(), x, y);
     }
 
+    private int shopX(int value, double scaleX) {
+        return (int)Math.round(value * scaleX);
+    }
+
+    private int shopY(int value, double scaleY) {
+        return (int)Math.round(value * scaleY);
+    }
+
+    private Font shopFont(String name, int style, int size, double scaleX, double scaleY) {
+        int scaledSize = Math.max(10, (int)Math.round(size * Math.min(scaleX, scaleY)));
+        return new Font(name, style, scaledSize);
+    }
+
     private void drawShop(Graphics2D g2) {
 
         if (playerCharacter == null) return;
 
         int screenW = getWidth();
         int screenH = getHeight();
+        double shopScaleX = screenW / (double) SHOP_DESIGN_W;
+        double shopScaleY = screenH / (double) SHOP_DESIGN_H;
 
         // ===== BACKGROUND =====
         g2.drawImage(shopBG, 0, 0, screenW, screenH, null);
 
         // ===== MAKO =====
         Image makoToDraw = makoBlink ? makoBlinkImg : makoImg;
-        g2.drawImage(makoToDraw, 60, screenH - 510, 350, 350, null);
+        g2.drawImage(makoToDraw,
+                shopX(60, shopScaleX), shopY(210, shopScaleY),
+                shopX(350, shopScaleX), shopY(350, shopScaleY), null);
 
         // ===== GOLD =====
         g2.setColor(Color.WHITE);
-        g2.setFont(new Font("Arial", Font.BOLD, 20));
-        g2.drawImage(coinImg, 20, 20, 30, 30, null);
-        g2.drawString(String.valueOf(playerCharacter.getGold()), 60, 45);
+        g2.setFont(shopFont("Arial", Font.BOLD, 20, shopScaleX, shopScaleY));
+        g2.drawImage(coinImg,
+                shopX(20, shopScaleX), shopY(20, shopScaleY),
+                shopX(30, shopScaleX), shopY(30, shopScaleY), null);
+        g2.drawString(String.valueOf(playerCharacter.getGold()), shopX(60, shopScaleX), shopY(45, shopScaleY));
         // ===== FEEDBACK MESSAGE (top-centre, never overlaps buttons) =====
         if (shopFeedbackTimer > 0 && !shopFeedback.isEmpty()) {
             float alpha = Math.min(1f, shopFeedbackTimer / 30f);
@@ -2921,12 +2942,12 @@ public class GameScreen extends JPanel implements Runnable {
                     : new Color(30, 130, 60,  (int)(200 * alpha));
             Color txtColor = new Color(255, 255, 255, (int)(255 * alpha));
 
-            g2.setFont(new Font("Arial", Font.BOLD, 16));
+            g2.setFont(shopFont("Arial", Font.BOLD, 16, shopScaleX, shopScaleY));
             FontMetrics fm2 = g2.getFontMetrics();
-            int msgW = fm2.stringWidth(shopFeedback) + 32;
-            int msgH = 34;
+            int msgW = fm2.stringWidth(shopFeedback) + shopX(32, shopScaleX);
+            int msgH = shopY(34, shopScaleY);
             int msgX = (screenW - msgW) / 2;
-            int msgY = 14;
+            int msgY = shopY(14, shopScaleY);
 
             g2.setColor(bgColor);
             g2.fillRoundRect(msgX, msgY, msgW, msgH, msgH, msgH);
@@ -2937,35 +2958,35 @@ public class GameScreen extends JPanel implements Runnable {
         }
 
         // ===== ITEM CARDS =====
-        int cardY = 120;
+        int cardY = shopY(120, shopScaleY);
 
         // CARD SETTINGS
-        int cardWidth = 260;
-        int spacing = 40;
+        int cardWidth = shopX(260, shopScaleX);
+        int spacing = shopX(40, shopScaleX);
 
         // TOTAL WIDTH of both cards
         int totalWidth = (cardWidth * 2) + spacing;
 
         // START POSITION (adjust this to move left/right)
-        int startX = (screenW - totalWidth) / 2 + 120;
+        int startX = (screenW - totalWidth) / 2 + shopX(120, shopScaleX);
 
         // FINAL POSITIONS
         int leftX = startX;
         int rightX = startX + cardWidth + spacing;
 
-        drawItemCard(g2, leftX, cardY, true);
-        drawItemCard(g2, rightX, cardY, false);
+        drawItemCard(g2, leftX, cardY, shopScaleX, shopScaleY, true);
+        drawItemCard(g2, rightX, cardY, shopScaleX, shopScaleY, false);
         // ===== FEEDBACK MESSAGE =====
         if (shopMessageTimer > 0 && !shopMessage.isEmpty()) {
             float alpha = Math.min(1f, shopMessageTimer / 30f);
             int a = (int)(alpha * 255);
 
-            g2.setFont(new Font("Arial", Font.BOLD, 16));
+            g2.setFont(shopFont("Arial", Font.BOLD, 16, shopScaleX, shopScaleY));
             FontMetrics fmMsg = g2.getFontMetrics();
-            int msgW = fmMsg.stringWidth(shopMessage) + 32;
-            int msgH = 38;
+            int msgW = fmMsg.stringWidth(shopMessage) + shopX(32, shopScaleX);
+            int msgH = shopY(38, shopScaleY);
             int msgX = (screenW - msgW) / 2;
-            int msgY = screenH - 160;
+            int msgY = screenH - shopY(160, shopScaleY);
 
             Color bgCol = shopMessageIsError
                     ? new Color(120, 20, 20, Math.min(a, 210))
@@ -2987,7 +3008,8 @@ public class GameScreen extends JPanel implements Runnable {
             g2.drawString(shopMessage, msgX + 16, msgY + (msgH + fmMsg.getAscent() - fmMsg.getDescent()) / 2);
         }
         // ===== EXIT BUTTON =====
-        exitBtn = new Rectangle(160, screenH - 100, 150, 60);
+        exitBtn = new Rectangle(shopX(160, shopScaleX), screenH - shopY(100, shopScaleY),
+                shopX(150, shopScaleX), shopY(60, shopScaleY));
         boolean exitHov = hoveredBtn != null && hoveredBtn.equals(exitBtn);
 
         // Outer glow on hover
@@ -3010,7 +3032,7 @@ public class GameScreen extends JPanel implements Runnable {
         }
 
         // Text with drop shadow
-        g2.setFont(new Font("Arial", Font.BOLD, 16));
+        g2.setFont(shopFont("Arial", Font.BOLD, 16, shopScaleX, shopScaleY));
         FontMetrics fmExit = g2.getFontMetrics();
         int etx = exitBtn.x + (exitBtn.width - fmExit.stringWidth("EXIT")) / 2;
         int ety = exitBtn.y + (exitBtn.height + fmExit.getAscent()) / 2 - 4;
@@ -3020,10 +3042,10 @@ public class GameScreen extends JPanel implements Runnable {
         g2.drawString("EXIT", etx, ety);
     }
 
-    private void drawItemCard(Graphics2D g2, int x, int y, boolean isHealth) {
+    private void drawItemCard(Graphics2D g2, int x, int y, double shopScaleX, double shopScaleY, boolean isHealth) {
 
-        int w = 260;
-        int h = 360;
+        int w = shopX(260, shopScaleX);
+        int h = shopY(360, shopScaleY);
 
         // Card background
         g2.drawImage(itemCardImg, x, y, w, h, null);
@@ -3042,29 +3064,33 @@ public class GameScreen extends JPanel implements Runnable {
                 : "Grants 15%–25% EXP needed for next level.\nSpeeds up leveling.";
 
         // ICON
-        g2.drawImage(icon, x + 80, y + 50, 80, 80, null);
+        g2.drawImage(icon, x + shopX(80, shopScaleX), y + shopY(50, shopScaleY),
+                shopX(80, shopScaleX), shopY(80, shopScaleY), null);
 
         // NAME
-        g2.setFont(new Font("Arial", Font.BOLD, 16));
+        g2.setFont(shopFont("Arial", Font.BOLD, 16, shopScaleX, shopScaleY));
         g2.setColor(Color.WHITE);
         FontMetrics fm = g2.getFontMetrics();
         int nameX = x + (w - fm.stringWidth(name)) / 2;
-        g2.drawString(name, nameX, y + 155);
+        g2.drawString(name, nameX, y + shopY(155, shopScaleY));
 
         // DESCRIPTION
-        g2.setFont(new Font("Arial", Font.PLAIN, 12));
-        drawWrappedText(g2, desc, x + 40, y + 180, 180);
+        g2.setFont(shopFont("Arial", Font.PLAIN, 12, shopScaleX, shopScaleY));
+        drawWrappedText(g2, desc, x + shopX(40, shopScaleX), y + shopY(180, shopScaleY), shopX(180, shopScaleX));
 
         // Price (left side)
-        g2.drawImage(coinImg, x + 40, y + 300, 20, 20, null);
-        g2.drawString(String.valueOf(price), x + 70, y + 315);
+        g2.drawImage(coinImg, x + shopX(40, shopScaleX), y + shopY(300, shopScaleY),
+                shopX(20, shopScaleX), shopY(20, shopScaleY), null);
+        g2.drawString(String.valueOf(price), x + shopX(70, shopScaleX), y + shopY(315, shopScaleY));
 
         // Owned (right side)
-        g2.drawString("Owned: " + owned, x + 165, y + 315);
+        g2.drawString("Owned: " + owned, x + shopX(165, shopScaleX), y + shopY(315, shopScaleY));
 
         // BUTTONS
-        Rectangle buy = new Rectangle(x + 20, y + 400, 220, 45);
-        Rectangle sell = new Rectangle(x + 20, y + 450, 220, 45);
+        Rectangle buy = new Rectangle(x + shopX(20, shopScaleX), y + shopY(400, shopScaleY),
+                shopX(220, shopScaleX), shopY(45, shopScaleY));
+        Rectangle sell = new Rectangle(x + shopX(20, shopScaleX), y + shopY(450, shopScaleY),
+                shopX(220, shopScaleX), shopY(45, shopScaleY));
 
         if (isHealth) {
             buyHealthBtn = buy;

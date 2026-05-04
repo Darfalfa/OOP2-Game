@@ -35,7 +35,8 @@ public class AyaLogic extends Character {
                 break;
 
             case 3:
-                dmg = (int)(((random.nextInt(39 - 27 + 1) + 27) * (1 + 0.07 * (getLevel() - 1))) + (2 * (1 + 0.07 * (getLevel() - 1))));
+                // dmg = (int)(((random.nextInt(39 - 27 + 1) + 27) * (1 + 0.07 * (getLevel() - 1))) + (2 * (1 + 0.07 * (getLevel() - 1))));
+                dmg = (int)(((1000) * (1 + 0.07 * (getLevel() - 1))) + (2 * (1 + 0.07 * (getLevel() - 1))));
                 setSkillCooldown(3, 4);
                 break;
 

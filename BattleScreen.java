@@ -64,7 +64,7 @@ public class BattleScreen extends JPanel {
         String skill2 = playerCharacter.getSkillName(2).toUpperCase();
         String skill3 = playerCharacter.getSkillName(3).toUpperCase();
 
-        return new String[]{ skill1, skill2, skill3, "POTION" };
+        return new String[]{ skill1, skill2, skill3, "HEALTH POTION" };
     }
 
     // 3 skills + Potion
