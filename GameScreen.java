@@ -155,6 +155,10 @@ public class GameScreen extends JPanel implements Runnable {
     private boolean inBattle = false;
     private int postBattleCooldown = 0;
     private boolean navigatingToMenu = false;
+    private long runStartMillis = 0L;
+    private long elapsedBeforeStartMillis = 0L;
+    private long finishedElapsedMillis = 0L;
+    private boolean runTimerStopped = false;
 
     // SHOP SYSTEM
     private boolean shopDialogueOpen = false;
@@ -940,6 +944,7 @@ public class GameScreen extends JPanel implements Runnable {
         }
 
         resetRunState();
+        startRunTimer(0L);
         playMusic(WORLD_1_MUSIC);
 
         spawnEnemies();
@@ -960,6 +965,7 @@ public class GameScreen extends JPanel implements Runnable {
         setSelectedCharacter(save.character);
         resetRunState();
         applyGameSave(save);
+        startRunTimer(save.elapsedMillis);
         resumeExplorationMusic();
         requestFocusInWindow();
 
@@ -1000,6 +1006,10 @@ public class GameScreen extends JPanel implements Runnable {
         saveFeedbackTimer = 0;
         inBattle = false;
         postBattleCooldown = 0;
+        runStartMillis = 0L;
+        elapsedBeforeStartMillis = 0L;
+        finishedElapsedMillis = 0L;
+        runTimerStopped = false;
         lastPlayerLevel = -1;
         bossSpawned = false;
         puzzlePieceCount = 0;
@@ -1025,6 +1035,29 @@ public class GameScreen extends JPanel implements Runnable {
         gameThread = null;
         // Do NOT reset navigatingToMenu here — goToMainMenu() sets it before
         // calling stopGame(), and onBattleEnd()'s invokeLater must still see it.
+    }
+
+    private void startRunTimer(long elapsedMillis) {
+        elapsedBeforeStartMillis = Math.max(0L, elapsedMillis);
+        runStartMillis = System.currentTimeMillis();
+        finishedElapsedMillis = 0L;
+        runTimerStopped = false;
+    }
+
+    private void finishRunTimer() {
+        if (runTimerStopped) return;
+        finishedElapsedMillis = getElapsedMillis();
+        runTimerStopped = true;
+    }
+
+    private long getElapsedMillis() {
+        if (runTimerStopped) {
+            return finishedElapsedMillis;
+        }
+        if (runStartMillis <= 0L) {
+            return elapsedBeforeStartMillis;
+        }
+        return elapsedBeforeStartMillis + Math.max(0L, System.currentTimeMillis() - runStartMillis);
     }
 
     /** Called by the HUD button — sets the flag BEFORE stopping so onBattleEnd ignores it. */
@@ -1073,6 +1106,7 @@ public class GameScreen extends JPanel implements Runnable {
             save.expPotion = playerCharacter.getExpPotion();
         }
 
+        save.elapsedMillis = getElapsedMillis();
         save.puzzlePieceCount = puzzlePieceCount;
         System.arraycopy(puzzlePieceCollected, 0, save.puzzlePieces, 0, Math.min(puzzlePieceCollected.length, save.puzzlePieces.length));
         System.arraycopy(storyTriggered, 0, save.storyTriggered, 0, Math.min(storyTriggered.length, save.storyTriggered.length));
@@ -1417,6 +1451,14 @@ public class GameScreen extends JPanel implements Runnable {
                 if (defeated.character instanceof FinalBossLogic &&
                         inDungeon && currentWorld == 3 && dungeonManager.getCurrentDungeon() == 3) {
                     finalBossDefeated = true;
+                    finishRunTimer();
+                    SaveManager.savePlayer(
+                            window.getPlayerName(),
+                            selectedCharacter,
+                            getElapsedMillis(),
+                            playerCharacter != null ? playerCharacter.getLevel() : 1,
+                            window.getMonstersKilled()
+                    );
                     enemies.clear();
                     bossSpawned = true;
                 }
@@ -3506,6 +3548,7 @@ public class GameScreen extends JPanel implements Runnable {
         int sX = bX + bW + 12;
         settingsBtnRect = new Rectangle(sX, bY, sW, bH);
         drawHudButton(g2, settingsBtnRect, "SETTINGS", settingsBtnHovered);
+        drawGameTimer(g2);
 
         int nlW = 140;
         int nlH = 30;
@@ -3587,6 +3630,30 @@ public class GameScreen extends JPanel implements Runnable {
         g2.drawString(label, tx + 2, ty + 2);
         g2.setColor(hovered ? GOLD_LIGHT : GOLD);
         g2.drawString(label, tx, ty);
+    }
+
+    private void drawGameTimer(Graphics2D g2) {
+        String timeText = "TIME  " + SaveManager.formatTime(getElapsedMillis());
+        g2.setFont(new Font("Serif", Font.BOLD, 14));
+        FontMetrics fm = g2.getFontMetrics();
+
+        int w = Math.max(150, fm.stringWidth(timeText) + 30);
+        int h = 36;
+        int x = getWidth() - w - 16;
+        int y = 16;
+
+        g2.setColor(new Color(18, 9, 5, 180));
+        g2.fillRect(x, y, w, h);
+        g2.setColor(GOLD_DARK);
+        g2.setStroke(new BasicStroke(1.5f));
+        g2.drawRect(x, y, w, h);
+
+        int tx = x + (w - fm.stringWidth(timeText)) / 2;
+        int ty = y + (h + fm.getAscent() - fm.getDescent()) / 2;
+        g2.setColor(new Color(0, 0, 0, 180));
+        g2.drawString(timeText, tx + 2, ty + 2);
+        g2.setColor(GOLD_LIGHT);
+        g2.drawString(timeText, tx, ty);
     }
 
     private void drawGameSettings(Graphics2D g2) {

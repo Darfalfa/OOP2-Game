@@ -39,7 +39,7 @@ public class BattleScreen extends JPanel {
     private GameScreen gameScreen;
 
     // ── Battle state ─────────────────────────────────────────────────────────
-    private enum Phase { PLAYER_TURN, ENEMY_TURN, VICTORY, DEFEATED }
+    private enum Phase { PLAYER_TURN, ENEMY_TURN, VICTORY, DEFEATED, LEFT }
     private Phase phase = Phase.PLAYER_TURN;
 
     // battle logic objects
@@ -64,11 +64,11 @@ public class BattleScreen extends JPanel {
         String skill2 = playerCharacter.getSkillName(2).toUpperCase();
         String skill3 = playerCharacter.getSkillName(3).toUpperCase();
 
-        return new String[]{ skill1, skill2, skill3, "HEALTH POTION" };
+        return new String[]{ skill1, skill2, skill3, "HEALTH POTION", "LEAVE" };
     }
 
-    // 3 skills + Potion
-    private Rectangle[] btnRects = new Rectangle[4];
+    // 3 skills + Potion + Leave
+    private Rectangle[] btnRects = new Rectangle[5];
     private int hoveredBtn = -1;
 
     // Animation
@@ -626,7 +626,7 @@ public class BattleScreen extends JPanel {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if (phase == Phase.VICTORY || phase == Phase.DEFEATED) {
+                if (phase == Phase.VICTORY || phase == Phase.DEFEATED || phase == Phase.LEFT) {
                     endBattle();
                     return;
                 }
@@ -651,6 +651,7 @@ public class BattleScreen extends JPanel {
             case 1 -> doSkill(2, new Color(180, 80, 255, 180));
             case 2 -> doSkill(3, new Color(255, 180, 80, 180));
             case 3 -> doItems();
+            case 4 -> doLeave();
         }
     }
 
@@ -723,20 +724,14 @@ public class BattleScreen extends JPanel {
 
     }
 
-    /*
-    private void doRun() {
-        boolean success = Math.random() < 0.5;
-        if (success) {
-            addLog("You escaped!");
-            phase = Phase.DEFEATED;
-            playerWon = false;
-            scheduleEndScreen(1200);
-        } else {
-            addLog("Couldn't escape!");
-            afterPlayerAction();
-        }
+    private void doLeave() {
+        addLog("You avoided the battle.");
+        addLog(enemyCharacter.getName() + " is still roaming nearby.");
+        playerWon = false;
+        phase = Phase.LEFT;
+        stopIdleTimer();
+        repaint();
     }
-    */
 
 
     private void afterPlayerAction() {
@@ -968,7 +963,7 @@ public class BattleScreen extends JPanel {
         if (flashTicks > 0) { g2.setColor(flashColor); g2.fillRect(0, 0, W, H); }
 
         // Victory / Defeat overlay
-        if (phase == Phase.VICTORY || phase == Phase.DEFEATED) drawEndOverlay(g2, W, H);
+        if (phase == Phase.VICTORY || phase == Phase.DEFEATED || phase == Phase.LEFT) drawEndOverlay(g2, W, H);
 
         g2.dispose();
     }
@@ -1359,10 +1354,10 @@ public class BattleScreen extends JPanel {
 
     // ── Action buttons ────────────────────────────────────────────────────────
     private void drawActionButtons(Graphics2D g2, int W, int H) {
-        if (phase == Phase.VICTORY || phase == Phase.DEFEATED) return;
+        if (phase == Phase.VICTORY || phase == Phase.DEFEATED || phase == Phase.LEFT) return;
 
-        int btnW = 160, btnH = 50, gap = 20;
-        int totalW = 4 * btnW + 3 * gap;
+        int btnW = 150, btnH = 50, gap = 14;
+        int totalW = 5 * btnW + 4 * gap;
         int startX = (W - totalW) / 2;
         int btnY   = H - 90;
 
@@ -1622,9 +1617,10 @@ public class BattleScreen extends JPanel {
         g2.fillRect(0, 0, W, H);
 
         boolean won  = (phase == Phase.VICTORY);
-        String title = won ? "VICTORY!" : "DEFEATED";
+        boolean left = (phase == Phase.LEFT);
+        String title = won ? "VICTORY!" : left ? "BATTLE AVOIDED" : "DEFEATED";
         String sub   = won ? "Click anywhere to continue." : "Click anywhere to return.";
-        Color  tc    = won ? GOLD_LIGHT : new Color(220, 80, 80);
+        Color  tc    = won ? GOLD_LIGHT : left ? new Color(130, 210, 255) : new Color(220, 80, 80);
 
         g2.setFont(new Font("Serif", Font.BOLD, 64));
         FontMetrics fm = g2.getFontMetrics();

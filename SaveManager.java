@@ -17,12 +17,18 @@ public class SaveManager {
     public static class SaveRecord {
         public String name;
         public String character;
+        public long timeFinishedMillis;
         public int level;
         public int monstersKilled;
 
         public SaveRecord(String name, String character, int level, int monstersKilled) {
+            this(name, character, 0L, level, monstersKilled);
+        }
+
+        public SaveRecord(String name, String character, long timeFinishedMillis, int level, int monstersKilled) {
             this.name = name;
             this.character = cleanCharacter(character);
+            this.timeFinishedMillis = Math.max(0L, timeFinishedMillis);
             this.level = level;
             this.monstersKilled = monstersKilled;
         }
@@ -44,6 +50,7 @@ public class SaveManager {
         public int gold = 0;
         public int healthPotion = 0;
         public int expPotion = 0;
+        public long elapsedMillis = 0L;
         public int puzzlePieceCount = 0;
         public boolean[] puzzlePieces = new boolean[4];
         public boolean[] storyTriggered = new boolean[11];
@@ -66,10 +73,7 @@ public class SaveManager {
             System.err.println("Could not read leaderboard save file.");
         }
 
-        records.sort(Comparator
-                .comparingInt((SaveRecord r) -> r.level).reversed()
-                .thenComparingInt((SaveRecord r) -> r.monstersKilled).reversed()
-                .thenComparing(r -> r.name.toLowerCase()));
+        records.sort(SaveManager::compareRecords);
 
         return records;
     }
@@ -90,6 +94,10 @@ public class SaveManager {
     }
 
     public static void savePlayer(String name, String character, int level, int monstersKilled) {
+        savePlayer(name, character, 0L, level, monstersKilled);
+    }
+
+    public static void savePlayer(String name, String character, long timeFinishedMillis, int level, int monstersKilled) {
         String cleanName = cleanName(name);
         String cleanCharacter = cleanCharacter(character);
         List<SaveRecord> records = loadLeaderboard();
@@ -101,6 +109,10 @@ public class SaveManager {
                 if (!"Unknown".equalsIgnoreCase(cleanCharacter)) {
                     record.character = cleanCharacter;
                 }
+                if (timeFinishedMillis > 0 &&
+                        (record.timeFinishedMillis == 0 || timeFinishedMillis < record.timeFinishedMillis)) {
+                    record.timeFinishedMillis = timeFinishedMillis;
+                }
                 record.level = Math.max(record.level, level);
                 record.monstersKilled = Math.max(record.monstersKilled, monstersKilled);
                 updated = true;
@@ -109,7 +121,7 @@ public class SaveManager {
         }
 
         if (!updated) {
-            records.add(new SaveRecord(cleanName, cleanCharacter, level, monstersKilled));
+            records.add(new SaveRecord(cleanName, cleanCharacter, timeFinishedMillis, level, monstersKilled));
         }
 
         writeLeaderboard(records);
@@ -172,6 +184,7 @@ public class SaveManager {
         props.setProperty("gold", String.valueOf(save.gold));
         props.setProperty("healthPotion", String.valueOf(save.healthPotion));
         props.setProperty("expPotion", String.valueOf(save.expPotion));
+        props.setProperty("elapsedMillis", String.valueOf(Math.max(0L, save.elapsedMillis)));
         props.setProperty("puzzlePieceCount", String.valueOf(save.puzzlePieceCount));
         props.setProperty("puzzlePieces", joinBooleans(save.puzzlePieces));
         props.setProperty("storyTriggered", joinBooleans(save.storyTriggered));
@@ -204,6 +217,9 @@ public class SaveManager {
         String[] parts = line.split("\\|");
 
         try {
+            if (parts.length == 5) {
+                return new SaveRecord(parts[0], parts[1], Long.parseLong(parts[2]), Integer.parseInt(parts[3]), Integer.parseInt(parts[4]));
+            }
             if (parts.length == 4) {
                 return new SaveRecord(parts[0], parts[1], Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
             }
@@ -221,7 +237,7 @@ public class SaveManager {
 
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(LEADERBOARD_FILE, false))) {
             for (SaveRecord record : records) {
-                bw.write(record.name + "|" + cleanCharacter(record.character) + "|" + record.level + "|" + record.monstersKilled);
+                bw.write(record.name + "|" + cleanCharacter(record.character) + "|" + record.timeFinishedMillis + "|" + record.level + "|" + record.monstersKilled);
                 bw.newLine();
             }
         } catch (IOException e) {
@@ -253,6 +269,7 @@ public class SaveManager {
         save.gold = intProp(props, "gold", 0);
         save.healthPotion = intProp(props, "healthPotion", 0);
         save.expPotion = intProp(props, "expPotion", 0);
+        save.elapsedMillis = longProp(props, "elapsedMillis", 0L);
         save.puzzlePieceCount = intProp(props, "puzzlePieceCount", 0);
         readBooleans(props.getProperty("puzzlePieces", ""), save.puzzlePieces);
         readBooleans(props.getProperty("storyTriggered", ""), save.storyTriggered);
@@ -274,6 +291,48 @@ public class SaveManager {
         } catch (NumberFormatException e) {
             return fallback;
         }
+    }
+
+    private static long longProp(Properties props, String key, long fallback) {
+        try {
+            return Long.parseLong(props.getProperty(key, String.valueOf(fallback)));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private static int compareRecords(SaveRecord a, SaveRecord b) {
+        boolean aFinished = a.timeFinishedMillis > 0;
+        boolean bFinished = b.timeFinishedMillis > 0;
+
+        if (aFinished && bFinished) {
+            int byTime = Long.compare(a.timeFinishedMillis, b.timeFinishedMillis);
+            if (byTime != 0) return byTime;
+        } else if (aFinished != bFinished) {
+            return aFinished ? -1 : 1;
+        }
+
+        int byLevel = Integer.compare(b.level, a.level);
+        if (byLevel != 0) return byLevel;
+
+        int byKills = Integer.compare(b.monstersKilled, a.monstersKilled);
+        if (byKills != 0) return byKills;
+
+        return a.name.compareToIgnoreCase(b.name);
+    }
+
+    public static String formatTime(long millis) {
+        if (millis <= 0) return "--";
+
+        long totalSeconds = millis / 1000;
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        }
+        return String.format("%02d:%02d", minutes, seconds);
     }
 
     private static String joinBooleans(boolean[] values) {

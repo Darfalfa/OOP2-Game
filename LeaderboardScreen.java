@@ -74,7 +74,7 @@ public class LeaderboardScreen extends JPanel {
         g2.setColor(GOLD_LIGHT);
         g2.drawString(title, titleX, 80);
 
-        int tableX = 220;
+        int tableX = 90;
         int tableY = 132;
         int tableW = W - tableX * 2;
         int rowH = 42;
@@ -85,7 +85,7 @@ public class LeaderboardScreen extends JPanel {
         g2.setStroke(new BasicStroke(1.5f));
         g2.drawRect(tableX, tableY, tableW, 430);
 
-        drawRow(g2, tableX, tableY, tableW, rowH, "PLAYER NAME", "CHARACTER SELECTED", "LEVEL", "MONSTER KILLED", true);
+        drawRow(g2, tableX, tableY, tableW, rowH, "PLAYER NAME", "CHARACTER SELECTED", "TIME FINISHED", "LEVEL", "MONSTER KILLED", true);
 
         List<SaveManager.SaveRecord> records = SaveManager.loadLeaderboard();
         if (records.isEmpty()) {
@@ -101,6 +101,7 @@ public class LeaderboardScreen extends JPanel {
                 drawRow(g2, tableX, tableY + rowH * (i + 1), tableW, rowH,
                         record.name,
                         record.character,
+                        SaveManager.formatTime(record.timeFinishedMillis),
                         String.valueOf(record.level),
                         String.valueOf(record.monstersKilled),
                         false);
@@ -114,7 +115,7 @@ public class LeaderboardScreen extends JPanel {
     }
 
     private void drawRow(Graphics2D g2, int x, int y, int w, int h,
-                         String name, String character, String level, String kills, boolean header) {
+                         String name, String character, String timeFinished, String level, String kills, boolean header) {
         g2.setColor(header ? new Color(80, 40, 10, 220) : new Color(0, 0, 0, 60));
         g2.fillRect(x, y, w, h);
         g2.setColor(GOLD_DARK);
@@ -124,13 +125,15 @@ public class LeaderboardScreen extends JPanel {
         g2.setColor(header ? GOLD_LIGHT : TEXT);
 
         int nameX = x + 28;
-        int characterX = x + (int)(w * 0.36);
-        int levelX = x + (int)(w * 0.66);
-        int killsX = x + w - 180;
+        int characterX = x + (int)(w * 0.27);
+        int timeX = x + (int)(w * 0.52);
+        int levelX = x + (int)(w * 0.72);
+        int killsX = x + (int)(w * 0.84);
         int textY = y + 27;
 
         g2.drawString(name, nameX, textY);
         g2.drawString(character, characterX, textY);
+        g2.drawString(timeFinished, timeX, textY);
         g2.drawString(level, levelX, textY);
         g2.drawString(kills, killsX, textY);
     }
