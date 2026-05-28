@@ -725,7 +725,16 @@ public class BattleScreen extends JPanel {
     }
 
     private void doLeave() {
+        playerCharacter.restoreStats();
+        playerCharacter.resetCooldowns();
+        playerCharacter.resetTurnCounter();
+        enemyCharacter.restoreStats();
+
+        displayPlayerHp = playerCharacter.getHp();
+        displayEnemyHp = enemyCharacter.getHp();
+
         addLog("You avoided the battle.");
+        addLog("HP restored and cooldowns reset.");
         addLog(enemyCharacter.getName() + " is still roaming nearby.");
         playerWon = false;
         phase = Phase.LEFT;
